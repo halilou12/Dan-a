@@ -61,7 +61,7 @@ const CertificateDocument = ({
         </div>
 
         {/* Student name — under "proudly presented to" (center body) */}
-        <div className="absolute left-0 w-full text-center" style={{ top: '42%' }}>
+        <div className="absolute left-0 w-full text-center" style={{ top: '50%' }}>
           <p
             className="mx-auto font-serif font-bold text-white"
             style={{
@@ -76,7 +76,7 @@ const CertificateDocument = ({
         </div>
 
         {/* Program title — below the name */}
-        <div className="absolute left-0 w-full text-center" style={{ top: '53%' }}>
+        <div className="absolute left-0 w-full text-center" style={{ top: '60%' }}>
           <p
             className="mx-auto px-[10%] font-medium text-white"
             style={{

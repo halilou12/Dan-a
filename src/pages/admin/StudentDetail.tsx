@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
 import CertificateDocument from '../../components/CertificateDocument';
+import { syncCertificate } from '../../lib/api';
+import { getToken } from '../../lib/auth';
 import {
   useStore,
   PROGRAMS,
@@ -197,13 +199,45 @@ const ProgramCard = ({ studentId, programId }: { studentId: string; programId: s
     );
   };
 
-  const issue = () => {
+  const issue = async () => {
     const cert = issueCertificate(studentId, programId);
-    setNotice(
-      cert
-        ? { kind: 'success', text: `Certificate ${cert.id} issued. Scan the QR below to open the verification page.` }
-        : { kind: 'error', text: 'Certificate already issued or student is not graduated.' },
-    );
+    if (!cert) {
+      setNotice({ kind: 'error', text: 'Certificate already issued or student is not graduated.' });
+      return;
+    }
+    const adminToken = getToken();
+    if (adminToken) {
+      try {
+        await syncCertificate(adminToken, {
+          id: cert.id,
+          token: cert.token,
+          studentId: student.id,
+          studentName: student.fullName,
+          studentPhoto: student.photo,
+          programId: program.id,
+          programTitle: program.title,
+          programWeeks: program.weeks,
+          modules: program.modules,
+          issueDate: cert.issueDate,
+          status: cert.status,
+          assessments: assessments.map((a) => ({
+            module: a.module,
+            grade: a.grade,
+            score: a.score,
+            assessedDate: a.assessedDate,
+            assessor: a.assessor,
+          })),
+        });
+        setNotice({ kind: 'success', text: `Certificate ${cert.id} issued, saved and verifiable by QR scan.` });
+      } catch (e) {
+        setNotice({
+          kind: 'success',
+          text: `Certificate ${cert.id} issued (QR saved). Note: could not sync to server — ${e instanceof Error ? e.message : 'error'}`,
+        });
+      }
+    } else {
+      setNotice({ kind: 'success', text: `Certificate ${cert.id} issued. Scan the QR below to open the verification page.` });
+    }
   };
 
   const markAllCompetent = () => {

@@ -171,3 +171,93 @@ export const deleteGalleryImage = async (
     throw err;
   }
 };
+
+export interface ServerCertCheck {
+  certificate: {
+    id: string;
+    studentId: string;
+    programId: string;
+    token: string;
+    issueDate: string;
+    status: string;
+    revokedDate?: string;
+    revokedReason?: string;
+  };
+  student: { fullName: string; photo?: string | null };
+  program: { title: string; weeks: number; modules: string[] };
+  academicRecord: {
+    module: string;
+    grade: string;
+    score: number;
+    assessedDate: string;
+    assessor: string;
+  }[];
+}
+
+export const verifyCertificateOnServer = async (
+  token: string,
+): Promise<ServerCertCheck> => {
+  const res = await fetch(`/api/verify/${encodeURIComponent(token)}`);
+  let data: { error?: string } & Partial<ServerCertCheck> | null = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    if (res.status === 404) {
+      const err = new Error('Not found') as ApiError;
+      err.status = 404;
+      throw err;
+    }
+    const err = new Error(data?.error || 'Verification failed.') as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+  return data as unknown as ServerCertCheck;
+};
+
+export const syncCertificate = async (
+  token: string,
+  payload: {
+    id: string;
+    token: string;
+    studentId: string;
+    studentName: string;
+    studentPhoto?: string | null;
+    programId: string;
+    programTitle: string;
+    programWeeks: number;
+    modules: string[];
+    issueDate: string;
+    status: string;
+    assessments: {
+      module: string;
+      grade: string;
+      score: number;
+      assessedDate?: string;
+      assessor?: string;
+    }[];
+  },
+): Promise<void> => {
+  const res = await fetch('/api/admin/certificates', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    let msg = 'Failed to save certificate.';
+    try {
+      const data = await res.json();
+      if (data?.error) msg = data.error;
+    } catch {
+      // ignore
+    }
+    const err = new Error(msg) as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+};

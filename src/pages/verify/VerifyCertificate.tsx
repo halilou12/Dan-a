@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   BadgeCheck,
@@ -19,6 +19,10 @@ import {
   programById,
   assessmentsOf,
 } from '../../lib/store';
+import {
+  verifyCertificateOnServer,
+  type ServerCertCheck,
+} from '../../lib/api';
 import CertificateDocument from '../../components/CertificateDocument';
 
 const StatusPill = ({ tone, children }: { tone: 'green' | 'red' | 'amber'; children: React.ReactNode }) => {
@@ -58,29 +62,141 @@ const LookupForm = ({ onSearch, autoFocus }: { onSearch: (value: string) => void
   );
 };
 
+interface ResolvedCert {
+  id: string;
+  token: string;
+  issueDate: string;
+  status: 'valid' | 'revoked';
+  revokedDate?: string;
+  revokedReason?: string;
+  studentId: string;
+  studentName?: string;
+  studentPhoto?: string | null;
+  programId: string;
+  programTitle?: string;
+  weeks?: number;
+  modules: string[];
+  record: { module: string; grade: string; score: number; assessedDate: string; assessor: string }[];
+}
+
 const VerifyCertificate = () => {
   const { token } = useParams();
   const navigate = useNavigate();
 
+  const [state, setState] = useState<{
+    phase: 'idle' | 'loading' | 'found' | 'notfound';
+    cert: ResolvedCert | null;
+  }>({ phase: 'idle', cert: null });
+
   const hasToken = Boolean(token && token.trim());
-  const certificate = hasToken
-    ? findCertificateByToken(token!) ?? findCertificateById(token!)
-    : undefined;
-  const isLoaded = hasToken;
+
+  useEffect(() => {
+    if (!hasToken) {
+      setState({ phase: 'idle', cert: null });
+      return;
+    }
+    let active = true;
+    const look = token!.trim();
+    setState({ phase: 'loading', cert: null });
+
+    const resolveLocal = (): ResolvedCert | null => {
+      const cert = findCertificateByToken(look) ?? findCertificateById(look);
+      if (!cert) return null;
+      const student = findStudent(cert.studentId);
+      const program = programById(cert.programId);
+      const record = assessmentsOf(cert.studentId, cert.programId);
+      return {
+        id: cert.id,
+        token: cert.token,
+        issueDate: cert.issueDate,
+        status: cert.status,
+        revokedDate: cert.revokedDate,
+        revokedReason: cert.revokedReason,
+        studentId: cert.studentId,
+        studentName: student?.fullName,
+        studentPhoto: student?.photo,
+        programId: cert.programId,
+        programTitle: program?.title,
+        weeks: program?.weeks,
+        modules: program?.modules ?? [],
+        record: record.map((a) => ({
+          module: a.module,
+          grade: a.grade,
+          score: a.score,
+          assessedDate: a.assessedDate,
+          assessor: a.assessor,
+        })),
+      };
+    };
+
+    (async () => {
+      try {
+        const server: ServerCertCheck = await verifyCertificateOnServer(look);
+        if (!active) return;
+        setState({
+          phase: 'found',
+          cert: {
+            id: server.certificate.id,
+            token: server.certificate.token,
+            issueDate: server.certificate.issueDate,
+            status: (server.certificate.status as 'valid' | 'revoked') || 'valid',
+            revokedDate: server.certificate.revokedDate,
+            revokedReason: server.certificate.revokedReason,
+            studentId: server.certificate.studentId,
+            studentName: server.student.fullName,
+            studentPhoto: server.student.photo,
+            programId: server.certificate.programId,
+            programTitle: server.program.title,
+            weeks: server.program.weeks,
+            modules: server.program.modules,
+            record: server.academicRecord,
+          },
+        });
+      } catch (e: unknown) {
+        // Server unavailable or not found on server → fall back to local data.
+        const status = (e as { status?: number })?.status;
+        if (!active) return;
+        const local = resolveLocal();
+        if (local) {
+          setState({ phase: 'found', cert: local });
+        } else if (status === 404) {
+          setState({ phase: 'notfound', cert: null });
+        } else {
+          // Network/server error and no local copy → treat as not found.
+          setState(local ? { phase: 'found', cert: local } : { phase: 'notfound', cert: null });
+        }
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [token, hasToken]);
 
   const search = (value: string) => navigate(`/verify/${encodeURIComponent(value)}`, { replace: true });
 
-  if (!isLoaded) {
+  const cert = state.cert;
+  const averagePct = cert && cert.record.length
+    ? Math.round(cert.record.reduce((s, a) => s + a.score, 0) / cert.record.length)
+    : null;
+
+  // Header block reused across states.
+  const header = (
+    <div className="flex items-center gap-3 mb-6">
+      <img src="/images/KBS.jpeg" alt="KSB logo" className="h-12 w-12 rounded-full object-cover" />
+      <div>
+        <h1 className="text-2xl font-bold text-[var(--text-dark)]">Certificate Verification</h1>
+        <p className="text-sm text-[var(--text-light)]">The Kigali Specialist Barista · Official Verification</p>
+      </div>
+    </div>
+  );
+
+  // No token given → lookup form.
+  if (!hasToken || state.phase === 'idle') {
     return (
       <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
         <div className="bg-white rounded-2xl shadow-md border border-[var(--coffee-accent)]/20 p-8 animate-fade-in">
-          <div className="flex items-center gap-3 mb-6">
-            <img src="/images/KBS.jpeg" alt="KSB logo" className="h-12 w-12 rounded-full object-cover" />
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--text-dark)]">Certificate Verification</h1>
-              <p className="text-sm text-[var(--text-light)]">The Kigali Specialist Barista · Official Verification</p>
-            </div>
-          </div>
+          {header}
           <p className="text-[var(--text-medium)] mb-6">
             Scan the QR code on any KSB certificate, or enter its Certificate ID below to confirm whether it is genuine.
           </p>
@@ -93,17 +209,24 @@ const VerifyCertificate = () => {
     );
   }
 
-  if (!certificate) {
+  // Loading.
+  if (state.phase === 'loading') {
+    return (
+      <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-md border border-[var(--coffee-accent)]/20 p-8 animate-fade-in">
+          {header}
+          <p className="text-[var(--text-medium)]">Checking certificate&hellip;</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Not found.
+  if (state.phase === 'notfound' || !cert) {
     return (
       <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
         <div className="bg-white rounded-2xl shadow-md border border-red-200 p-8 animate-fade-in">
-          <div className="flex items-center gap-3 mb-6">
-            <img src="/images/KBS.jpeg" alt="KSB logo" className="h-12 w-12 rounded-full object-cover" />
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--text-dark)]">Certificate Verification</h1>
-              <p className="text-sm text-[var(--text-light)]">The Kigali Specialist Barista · Official Verification</p>
-            </div>
-          </div>
+          {header}
           <div className="flex items-center gap-2 mb-4">
             <StatusPill tone="amber">Not Found</StatusPill>
             <h2 className="text-xl font-bold text-[var(--text-dark)]">We could not match this certificate</h2>
@@ -122,24 +245,11 @@ const VerifyCertificate = () => {
     );
   }
 
-  const student = findStudent(certificate.studentId);
-  const program = programById(certificate.programId);
-  const record = assessmentsOf(certificate.studentId, certificate.programId);
-  const averagePct = record.length
-    ? Math.round(record.reduce((s, a) => s + a.score, 0) / record.length)
-    : null;
-
-  if (certificate.status === 'revoked') {
+  if (cert.status === 'revoked') {
     return (
       <div className="py-16 px-4 sm:px-6 lg:px-8 max-w-3xl mx-auto">
         <div className="bg-white rounded-2xl shadow-md border border-red-200 p-8 animate-fade-in">
-          <div className="flex items-center gap-3 mb-6">
-            <img src="/images/KBS.jpeg" alt="KSB logo" className="h-12 w-12 rounded-full object-cover" />
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--text-dark)]">Certificate Verification</h1>
-              <p className="text-sm text-[var(--text-light)]">The Kigali Specialist Barista · Official Verification</p>
-            </div>
-          </div>
+          {header}
           <div className="flex items-center gap-2 mb-4">
             <StatusPill tone="red">INVALID · REVOKED</StatusPill>
             <h2 className="text-xl font-bold text-[var(--text-dark)]">This certificate is no longer valid</h2>
@@ -147,14 +257,14 @@ const VerifyCertificate = () => {
           <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <ShieldAlert className="h-6 w-6 text-red-600 shrink-0" />
             <div className="text-sm text-[var(--text-medium)]">
-              <p className="font-semibold text-red-800 mb-1">Certificate ID: {certificate.id}</p>
-              {certificate.revokedDate && (
-                <p className="mb-1">Revoked on: <span className="font-medium">{certificate.revokedDate}</span></p>
+              <p className="font-semibold text-red-800 mb-1">Certificate ID: {cert.id}</p>
+              {cert.revokedDate && (
+                <p className="mb-1">Revoked on: <span className="font-medium">{cert.revokedDate}</span></p>
               )}
-              {certificate.revokedReason && (
-                <p className="mb-2">Reason: {certificate.revokedReason}</p>
+              {cert.revokedReason && (
+                <p className="mb-2">Reason: {cert.revokedReason}</p>
               )}
-              <p>This holder is not currently certified by The Kigali Specialist Barista for {program?.title}. Please contact KSB for further details.</p>
+              <p>This holder is not currently certified by The Kigali Specialist Barista for {cert.programTitle}. Please contact KSB for further details.</p>
             </div>
           </div>
           <LookupForm onSearch={search} />
@@ -183,22 +293,22 @@ const VerifyCertificate = () => {
         <div className="p-6 sm:p-8">
           <div className="ksb-print-page">
             <CertificateDocument
-              certId={certificate.id}
-              fullName={student?.fullName ?? ''}
-              programTitle={program?.title ?? ''}
-              issueDate={certificate.issueDate}
-              weeks={program?.weeks}
-              photo={student?.photo}
-              token={certificate.token}
+              certId={cert.id}
+              fullName={cert.studentName ?? ''}
+              programTitle={cert.programTitle ?? ''}
+              issueDate={cert.issueDate}
+              weeks={cert.weeks}
+              photo={cert.studentPhoto}
+              token={cert.token}
               status="valid"
             />
           </div>
 
           <p className="text-xs uppercase tracking-wider text-[var(--text-light)] mb-1 mt-8">This is to certify that</p>
-          <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-dark)] mb-1">{student?.fullName}</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-dark)] mb-1">{cert.studentName}</h2>
           <p className="text-[var(--text-medium)] mb-6">
-            has successfully completed the <span className="font-semibold text-[var(--coffee-dark)]">{program?.title}</span>
-            {program ? ` (${program.weeks} weeks)` : ''} barista training programme.
+            has successfully completed the <span className="font-semibold text-[var(--coffee-dark)]">{cert.programTitle}</span>
+            {cert.weeks ? ` (${cert.weeks} weeks)` : ''} barista training programme.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
@@ -206,14 +316,14 @@ const VerifyCertificate = () => {
               <Hash className="h-6 w-6 text-[var(--coffee-light)]" />
               <div>
                 <div className="text-xs text-[var(--text-light)]">Certificate ID</div>
-                <div className="font-mono text-sm font-semibold text-[var(--text-dark)]">{certificate.id}</div>
+                <div className="font-mono text-sm font-semibold text-[var(--text-dark)]">{cert.id}</div>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-[var(--coffee-accent)]/30 bg-[var(--cream-light)] p-4">
               <CalendarDays className="h-6 w-6 text-[var(--coffee-light)]" />
               <div>
                 <div className="text-xs text-[var(--text-light)]">Issued</div>
-                <div className="text-sm font-semibold text-[var(--text-dark)]">{certificate.issueDate}</div>
+                <div className="text-sm font-semibold text-[var(--text-dark)]">{cert.issueDate}</div>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-[var(--coffee-accent)]/30 bg-[var(--cream-light)] p-4">
@@ -225,12 +335,12 @@ const VerifyCertificate = () => {
             </div>
           </div>
 
-          {student?.photo && (
+          {cert.studentPhoto && (
             <div className="flex items-center gap-4 mb-8">
-              <img src={student.photo} alt={student.fullName} className="h-20 w-20 rounded-full object-cover border-4 border-[var(--coffee-accent)]/30" />
+              <img src={cert.studentPhoto} alt={cert.studentName} className="h-20 w-20 rounded-full object-cover border-4 border-[var(--coffee-accent)]/30" />
               <div>
                 <div className="text-xs text-[var(--text-light)]">Certificate holder</div>
-                <div className="font-semibold text-[var(--text-dark)]">{student.fullName}</div>
+                <div className="font-semibold text-[var(--text-dark)]">{cert.studentName}</div>
               </div>
             </div>
           )}
@@ -251,8 +361,8 @@ const VerifyCertificate = () => {
                 </tr>
               </thead>
               <tbody>
-                {program ? program.modules.map((m) => {
-                  const a = record.find((x) => x.module === m);
+                {cert.modules.length ? cert.modules.map((m) => {
+                  const a = cert.record.find((x) => x.module === m);
                   return (
                     <tr key={m} className="border-t border-[var(--cream)]">
                       <td className="px-4 py-2 font-medium text-[var(--text-dark)]">{m}</td>
@@ -272,7 +382,7 @@ const VerifyCertificate = () => {
                       <td className="px-4 py-2 text-[var(--text-medium)]">{a ? a.assessor : '—'}</td>
                     </tr>
                   );
-                }                ) : (
+                }) : (
                   <tr className="border-t border-[var(--cream)]">
                     <td colSpan={5} className="px-4 py-2 text-[var(--text-light)]">—</td>
                   </tr>

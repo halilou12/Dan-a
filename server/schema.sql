@@ -32,3 +32,55 @@ CREATE TABLE IF NOT EXISTS reset_tokens (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reset_user ON reset_tokens(user_id);
+
+-- Programs are a fixed catalog shared across all certificates.
+CREATE TABLE IF NOT EXISTS programs (
+    id        TEXT PRIMARY KEY,
+    title     TEXT NOT NULL,
+    weeks     INTEGER NOT NULL,
+    modules   JSONB NOT NULL
+);
+
+-- Certificate holders (public fields only; sensitive data stays client-side).
+CREATE TABLE IF NOT EXISTS students (
+    id        TEXT PRIMARY KEY,
+    full_name TEXT NOT NULL,
+    photo     TEXT,
+    status    TEXT NOT NULL DEFAULT 'active'
+);
+
+CREATE TABLE IF NOT EXISTS enrollments (
+    id             BIGSERIAL PRIMARY KEY,
+    student_id     TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    program_id     TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    enrolled_date  TEXT,
+    UNIQUE (student_id, program_id)
+);
+
+CREATE TABLE IF NOT EXISTS assessments (
+    id            BIGSERIAL PRIMARY KEY,
+    student_id    TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    program_id    TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    module        TEXT NOT NULL,
+    grade         TEXT NOT NULL,
+    score         INTEGER NOT NULL,
+    assessed_date TEXT,
+    assessor      TEXT,
+    UNIQUE (student_id, program_id, module)
+);
+
+CREATE TABLE IF NOT EXISTS certificates (
+    id             TEXT PRIMARY KEY,
+    token          TEXT NOT NULL UNIQUE,
+    student_id     TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    program_id     TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    issue_date     TEXT NOT NULL,
+    status         TEXT NOT NULL DEFAULT 'valid',
+    revoked_date   TEXT,
+    revoked_reason TEXT,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_cert_token ON certificates(token);
+CREATE INDEX IF NOT EXISTS idx_assessment_student ON assessments(student_id);
+
