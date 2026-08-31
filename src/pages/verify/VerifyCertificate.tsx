@@ -125,6 +125,9 @@ const VerifyCertificate = () => {
   const student = findStudent(certificate.studentId);
   const program = programById(certificate.programId);
   const record = assessmentsOf(certificate.studentId, certificate.programId);
+  const averagePct = record.length
+    ? Math.round(record.reduce((s, a) => s + a.score, 0) / record.length)
+    : null;
 
   if (certificate.status === 'revoked') {
     return (
@@ -269,12 +272,27 @@ const VerifyCertificate = () => {
                       <td className="px-4 py-2 text-[var(--text-medium)]">{a ? a.assessor : '—'}</td>
                     </tr>
                   );
-                }) : (
+                }                ) : (
                   <tr className="border-t border-[var(--cream)]">
                     <td colSpan={5} className="px-4 py-2 text-[var(--text-light)]">—</td>
                   </tr>
                 )}
               </tbody>
+              {averagePct !== null && (
+                <tfoot>
+                  <tr className="border-t-2 border-[var(--coffee-dark)] bg-[var(--cream)]">
+                    <td className="px-4 py-2.5 font-bold text-[var(--text-dark)]">Average</td>
+                    <td className="px-4 py-2.5 text-[var(--text-medium)]">
+                      <span className="font-semibold">{averagePct}%</span>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-semibold text-[var(--coffee-dark)]">
+                      {averagePct}/100
+                    </td>
+                    <td className="px-4 py-2.5" />
+                    <td className="px-4 py-2.5" />
+                  </tr>
+                </tfoot>
+              )}
             </table>
           </div>
 
