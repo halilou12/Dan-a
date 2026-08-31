@@ -91,6 +91,12 @@ const Footer = () => {
                 <span>&copy; {new Date().getFullYear()} The Kigali Specialist Barista. All rights reserved.</span>
                 <span className="hidden sm:inline">Built with passion for Rwandan coffee</span>
               </div>
+              <Link
+                to="/admin/login"
+                className="text-xs text-gray-500 hover:text-[var(--coffee-accent)] transition-colors"
+              >
+                Staff Login
+              </Link>
             </div>
           </div>
         </div>
