@@ -92,13 +92,21 @@ router.post('/auth/register', async (_req, res) => {
 // the project). Reads ADMIN_USERS as a JSON array: [{username, email, password}].
 // Idempotent: existing accounts are left untouched, so 2FA stays intact.
 async function seedAdmins() {
-  const raw = process.env.ADMIN_USERS;
+  let raw = process.env.ADMIN_USERS;
   if (!raw) return;
+  // Tolerate common paste/editor quirks: surrounding quotes, HTML entities,
+  // surrounding whitespace, and line breaks inside the JSON.
+  raw = String(raw).trim().replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+  while ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    raw = raw.slice(1, -1).trim();
+  }
+  raw = raw.replace(/\r?\n[\s]*/g, '').replace(/}\s*,?\s*{/g, '},{');
+
   let users;
   try {
     users = JSON.parse(raw);
-  } catch {
-    console.warn('ADMIN_USERS is not valid JSON. Skipping admin seeding.');
+  } catch (err) {
+    console.warn('ADMIN_USERS is not valid JSON. Provide a JSON array like [{"username":...}].', err.message);
     return;
   }
   if (!Array.isArray(users) || users.length === 0) return;
