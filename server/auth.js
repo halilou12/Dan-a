@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import speakeasy from 'speakeasy';
 import db from './db.js';
+import { sendEmail, appOrigin } from './email.js';
 
 const router = Router();
 
@@ -224,16 +225,15 @@ router.post('/auth/logout', requireAuth, (_req, res) => {
   res.json({ ok: true });
 });
 
-// Request a password reset. Issues a single-use token returned to the client.
-// In production, email this token to the user instead of returning it directly.
+// Request a password reset. Issues a single-use token and emails a clickable
+// reset link to the account's address. If SMTP is not configured (local dev),
+// the token is returned to the client so the flow can still be completed.
 router.post('/auth/forgot-password', async (req, res) => {
   try {
     const { email } = req.body || {};
     if (!email) return res.status(400).json({ error: 'Email is required.' });
-    const { rows } = await db.query(
-      'SELECT * FROM users WHERE email = $1',
-      [String(email).trim().toLowerCase()],
-    );
+    const normalized = String(email).trim().toLowerCase();
+    const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [normalized]);
     // Always respond the same way to avoid leaking which accounts exist.
     if (rows.length === 0) return res.json({ ok: true });
     const row = rows[0];
@@ -251,11 +251,26 @@ router.post('/auth/forgot-password', async (req, res) => {
       [row.id, hash64(raw), expiresAt],
     );
 
-    // For the demo we return the token so the flow can be completed in the UI.
-    // Replace with real email delivery for a production deployment.
-    res.json({
+    const resetUrl = `${appOrigin()}/admin/reset?token=${encodeURIComponent(raw)}`;
+    const mintes = Math.floor(RESET_TTL_MS / 60000);
+
+    const sent = await sendEmail({
+      to: normalized,
+      subject: 'Reset your KSB admin password',
+      text: `We received a request to reset your KSB admin password.\n\nClick the link below to set a new password. This link expires in ${mintes} minutes and can be used once.\n\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
+      html: `<div style="font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:24px;border:1px solid #e3d8c8;border-radius:12px">
+        <h2 style="color:#3b2a1a;margin-top:0">The Kigali Specialist Barista</h2>
+        <p>We received a request to reset your admin password.</p>
+        <p><a href="${resetUrl}" style="display:inline-block;background:#6f4e37;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600">Reset my password</a></p>
+        <p style="color:#8a6d53;font-size:13px">This link expires in ${mintes} minutes and can be used once. If you did not request this, you can safely ignore this email.</p>
+      </div>`,
+    });
+
+    return res.json({
       ok: true,
-      devToken: raw,
+      // Only returned when SMTP is not configured, so local dev still works.
+      devToken: sent ? undefined : raw,
+      emailed: sent,
       expiresInSeconds: Math.floor(RESET_TTL_MS / 1000),
     });
   } catch (err) {

@@ -147,9 +147,11 @@ const ForgotMode = ({ onReset }: { onReset: () => void }) => {
     }
     setMessage({
       kind: 'success',
-      text: res.devToken
-        ? 'Password recovery link generated. Copy the code below and use it to set a new password.'
-        : 'If that email has an admin account, a recovery link has been sent.',
+      text: res.emailed
+        ? 'We sent a password reset link to your email. Please check your inbox (and spam folder).'
+        : res.devToken
+          ? 'Password recovery link generated. Copy the code below and use it to set a new password.'
+          : 'If that email has an admin account, a recovery link has been sent.',
     });
   };
 

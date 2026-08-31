@@ -166,13 +166,19 @@ export type ForgotResult = {
   ok: boolean;
   error?: string;
   devToken?: string;
+  emailed?: boolean;
   expiresInSeconds?: number;
 };
 
 export const requestPasswordReset = async (email: string): Promise<ForgotResult> => {
   try {
     const res = await api.forgotPassword({ email });
-    return { ok: true, devToken: res.devToken, expiresInSeconds: res.expiresInSeconds };
+    return {
+      ok: true,
+      devToken: res.devToken,
+      emailed: res.emailed,
+      expiresInSeconds: res.expiresInSeconds,
+    };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : 'Request failed.' };
   }

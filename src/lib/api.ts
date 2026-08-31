@@ -59,6 +59,7 @@ export interface Verify2faResponse {
 export interface ForgotPasswordResponse {
   ok: boolean;
   devToken?: string;
+  emailed?: boolean;
   expiresInSeconds?: number;
 }
 
