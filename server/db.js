@@ -17,15 +17,24 @@ export const pool = new Pool({
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
 });
 
+let dbReady = false;
+
 async function initSchema() {
   const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
   await pool.query(schema);
+  dbReady = true;
 }
 
 initSchema().catch((err) => {
-  console.error('Failed to apply database schema:', err);
-  process.exit(1);
+  console.warn('Database unavailable (schema init skipped):', err.message || err);
 });
+
+export const requireDb = (_req, res, next) => {
+  if (!dbReady) {
+    return res.status(503).json({ error: 'Database is not available. Please try again later.' });
+  }
+  next();
+};
 
 export default {
   query: (text, params) => pool.query(text, params),

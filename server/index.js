@@ -3,6 +3,7 @@ import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import fs from 'node:fs';
+import { requireDb } from './db.js';
 import { authRouter } from './auth.js';
 import { galleryRouter } from './gallery.js';
 
@@ -12,10 +13,10 @@ const PORT = process.env.PORT || 4000;
 
 app.use(express.json({ limit: '5mb' }));
 
-app.use(express.static(path.join(__dirname, '..', 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
-app.use('/api/admin', authRouter);
-app.use('/api/gallery', galleryRouter);
+app.use('/api/admin', requireDb, authRouter);
+app.use('/api/gallery', requireDb, galleryRouter);
 
 app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'ksb-admin-api' });

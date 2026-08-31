@@ -19,6 +19,7 @@ import {
   programById,
   assessmentsOf,
 } from '../../lib/store';
+import CertificateDocument from '../../components/CertificateDocument';
 
 const StatusPill = ({ tone, children }: { tone: 'green' | 'red' | 'amber'; children: React.ReactNode }) => {
   const styles = {
@@ -177,7 +178,20 @@ const VerifyCertificate = () => {
         </div>
 
         <div className="p-6 sm:p-8">
-          <p className="text-xs uppercase tracking-wider text-[var(--text-light)] mb-1">This is to certify that</p>
+          <div className="ksb-print-page">
+            <CertificateDocument
+              certId={certificate.id}
+              fullName={student?.fullName ?? ''}
+              programTitle={program?.title ?? ''}
+              issueDate={certificate.issueDate}
+              weeks={program?.weeks}
+              photo={student?.photo}
+              token={certificate.token}
+              status="valid"
+            />
+          </div>
+
+          <p className="text-xs uppercase tracking-wider text-[var(--text-light)] mb-1 mt-8">This is to certify that</p>
           <h2 className="text-3xl sm:text-4xl font-bold text-[var(--text-dark)] mb-1">{student?.fullName}</h2>
           <p className="text-[var(--text-medium)] mb-6">
             has successfully completed the <span className="font-semibold text-[var(--coffee-dark)]">{program?.title}</span>

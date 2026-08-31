@@ -76,3 +76,32 @@
   from { opacity: 0; transform: translateY(-10px); }
   to { opacity: 1; transform: translateY(0); }
 }
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .ksb-print-page {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ksb-certificate {
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-break-avoid {
+    break-inside: avoid;
+  }
+}

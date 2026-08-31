@@ -12,6 +12,7 @@ import {
   Printer,
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
+import CertificateDocument from '../../components/CertificateDocument';
 import {
   useStore,
   PROGRAMS,
@@ -46,7 +47,7 @@ interface Notice {
   text: string;
 }
 
-const CertificateCard = ({ certificate }: { certificate: { id: string; token: string; issueDate: string; status: 'valid' | 'revoked'; revokedDate?: string; revokedReason?: string } }) => {
+const CertificateCard = ({ certificate, fullName, programTitle, weeks }: { certificate: { id: string; token: string; issueDate: string; status: 'valid' | 'revoked'; revokedDate?: string; revokedReason?: string }; fullName: string; programTitle: string; weeks?: number }) => {
   const [showRevoke, setShowRevoke] = useState(false);
   const [reason, setReason] = useState('');
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -57,7 +58,7 @@ const CertificateCard = ({ certificate }: { certificate: { id: string; token: st
   };
 
   return (
-    <div className="rounded-xl border border-[var(--coffee-accent)]/30 bg-[var(--cream-light)] p-5">
+    <div className="rounded-xl border border-[var(--coffee-accent)]/30 bg-[var(--cream-light)] p-5 print-break-avoid">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-3">
           <Award className="h-8 w-8 text-[var(--coffee-light)]" />
@@ -137,6 +138,20 @@ const CertificateCard = ({ certificate }: { certificate: { id: string; token: st
       <p className="text-xs text-[var(--text-light)] mt-2">
         {verificationURL(certificate.token)}
       </p>
+
+      {certificate.status === 'valid' && (
+        <div className="mt-6 border-t border-[var(--coffee-accent)]/30 pt-6">
+          <CertificateDocument
+            certId={certificate.id}
+            fullName={fullName}
+            programTitle={programTitle}
+            issueDate={certificate.issueDate}
+            weeks={weeks}
+            token={certificate.token}
+            status="valid"
+          />
+        </div>
+      )}
     </div>
   );
 };
@@ -314,7 +329,12 @@ const ProgramCard = ({ studentId, programId }: { studentId: string; programId: s
 
       {certificates.map((c) => (
         <div key={c.id} className="mt-5">
-          <CertificateCard certificate={c} />
+          <CertificateCard
+            certificate={c}
+            fullName={student.fullName}
+            programTitle={program.title}
+            weeks={program.weeks}
+          />
         </div>
       ))}
     </div>
