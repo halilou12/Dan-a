@@ -37,11 +37,25 @@ app.use('/api', (err, _req, res, _next) => {
 
 // Serve the built frontend when it exists (production).
 const distDir = path.join(__dirname, '..', 'dist');
+const indexHtml = path.join(distDir, 'index.html');
+
 if (fs.existsSync(distDir)) {
+  // Serve assets (JS/CSS/images) and index.html for any non-API route so
+  // client-side routing (e.g. /admin/login, /verify/:token) always works.
   app.use(express.static(distDir));
-  app.get(/.*/, (_req, res) => {
-    res.sendFile(path.join(distDir, 'index.html'));
+  app.get(/.*/, (req, res, next) => {
+    if (req.path.startsWith('/api')) return next();
+    if (!fs.existsSync(indexHtml)) {
+      return res
+        .status(200)
+        .send(
+          '<!doctype html><html><head><meta charset="utf-8"><title>The Kigali Specialist Barista</title></head><body><h1>The Kigali Specialist Barista</h1><p>Loading…</p></body></html>',
+        );
+    }
+    res.sendFile(indexHtml);
   });
+} else {
+  console.warn('No dist/ directory found. Frontend route serving is disabled.');
 }
 
 app.listen(PORT, () => {
