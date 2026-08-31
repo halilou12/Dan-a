@@ -68,15 +68,6 @@ const randomToken = () =>
 const hash64 = (value) =>
   crypto.createHash('sha256').update(value).digest('hex');
 
-const publicUser = (row) => ({
-  id: String(row.id),
-  username: row.username,
-  email: row.email,
-  role: row.role,
-  seeded: Boolean(row.seeded),
-  totpSecret: row.totp_secret,
-});
-
 const requireAuth = (req, res, next) => {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -91,41 +82,55 @@ const requireAuth = (req, res, next) => {
 };
 
 // Register a new admin account.
-router.post('/auth/register', async (req, res) => {
+router.post('/auth/register', async (_req, res) => {
+  res.status(403).json({
+    error: 'Administrator registration is closed. Access is granted only to authorized staff.',
+  });
+});
+
+// Seed the team of administrators (the only people allowed to log in and manage
+// the project). Reads ADMIN_USERS as a JSON array: [{username, email, password}].
+// Idempotent: existing accounts are left untouched, so 2FA stays intact.
+async function seedAdmins() {
+  const raw = process.env.ADMIN_USERS;
+  if (!raw) return;
+  let users;
   try {
-    const { username, email, password } = req.body || {};
-    if (!username || !password || !email) {
-      return res.status(400).json({ error: 'Username, email and password are required.' });
-    }
-    if (String(username).trim().length < 3) {
-      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
-    }
-    if (String(password).length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
-    }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email))) {
-      return res.status(400).json({ error: 'Enter a valid email address.' });
-    }
-    const existing = await db.query(
-      'SELECT id FROM users WHERE username = $1 OR email = $2',
-      [String(username).trim(), String(email).trim().toLowerCase()],
-    );
-    if (existing.rows.length > 0) {
-      return res.status(409).json({ error: 'That username or email is already registered.' });
-    }
-    const passwordHash = bcrypt.hashSync(String(password), 12);
-    const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
-    const info = await db.query(
-      `INSERT INTO users (username, email, password_hash, totp_secret)
-       VALUES ($1, $2, $3, $4)
-       RETURNING *`,
-      [String(username).trim(), String(email).trim().toLowerCase(), passwordHash, totpSecret],
-    );
-    res.status(201).json({ user: publicUser(info.rows[0]) });
-  } catch (err) {
-    console.error('register error:', err);
-    res.status(500).json({ error: 'Something went wrong while creating the account.' });
+    users = JSON.parse(raw);
+  } catch {
+    console.warn('ADMIN_USERS is not valid JSON. Skipping admin seeding.');
+    return;
   }
+  if (!Array.isArray(users) || users.length === 0) return;
+
+  for (const u of users) {
+    const username = String(u.username || '').trim();
+    const email = String(u.email || '').trim().toLowerCase();
+    const password = String(u.password || '');
+    if (!username || !email || password.length < 8) continue;
+
+    try {
+      const existing = await db.query('SELECT id FROM users WHERE username = $1 OR email = $2', [
+        username,
+        email,
+      ]);
+      if (existing.rows.length > 0) continue;
+      const passwordHash = bcrypt.hashSync(password, 12);
+      const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
+      await db.query(
+        `INSERT INTO users (username, email, password_hash, totp_secret, seeded)
+         VALUES ($1, $2, $3, $4, TRUE)`,
+        [username, email, passwordHash, totpSecret],
+      );
+      console.log(`Seeded administrator account: ${username}`);
+    } catch (err) {
+      console.warn(`Could not seed administrator ${username}:`, err.message || err);
+    }
+  }
+}
+
+seedAdmins().catch((err) => {
+  console.warn('Admin seeding failed:', err.message || err);
 });
 
 router.get('/auth/session', requireAuth, async (req, res) => {

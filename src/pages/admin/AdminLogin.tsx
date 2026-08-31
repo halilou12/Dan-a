@@ -3,8 +3,6 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Mail,
-  CheckCircle2,
-  UserPlus,
   ShieldCheck,
   KeyRound as KeyRoundIcon,
 } from 'lucide-react';
@@ -14,18 +12,16 @@ import {
   login,
   verify2fa,
   isPending2fa,
-  registerAdmin,
-  requestPasswordReset,
-  completePasswordReset,
   getSetupSecret,
-  setSetupSecret,
   getPending2faSecret,
   otpauthURL,
   currentTotpCode,
   otpSecondsLeft,
+  requestPasswordReset,
+  completePasswordReset,
 } from '../../lib/auth';
 
-type Mode = 'login' | 'register' | 'register2fa' | 'forgot' | 'forgot-reset';
+type Mode = 'login' | 'forgot' | 'forgot-reset';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-[var(--text-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]';
@@ -125,105 +121,6 @@ const TfaStep = ({ onBack }: { onBack: () => void }) => {
         Back to login
       </button>
     </form>
-  );
-};
-
-const RegisterMode = ({ onDone }: { onDone: (username: string) => void }) => {
-  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' });
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const set = (field: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [field]: e.target.value }));
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    if (form.password !== form.confirm) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (form.password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    setBusy(true);
-    const res = await registerAdmin({
-      username: form.username,
-      email: form.email,
-      password: form.password,
-    });
-    setBusy(false);
-    if (!res.ok || !res.user?.totpSecret) {
-      setError(res.error ?? 'Registration failed.');
-      return;
-    }
-    setSetupSecret({ username: res.user.username, totpSecret: res.user.totpSecret });
-    onDone(res.user.username);
-  };
-
-  return (
-    <form onSubmit={submit} className="space-y-5">
-      <div>
-        <label className={labelClass}>Username</label>
-        <input type="text" value={form.username} onChange={set('username')} autoComplete="username" className={inputClass} placeholder="e.g. admin" />
-      </div>
-      <div>
-        <label className={labelClass}>Email</label>
-        <input type="email" value={form.email} onChange={set('email')} autoComplete="email" className={inputClass} placeholder="admin@example.com" />
-      </div>
-      <div>
-        <label className={labelClass}>Password</label>
-        <input type="password" value={form.password} onChange={set('password')} autoComplete="new-password" className={inputClass} placeholder="Min 8 characters" />
-      </div>
-      <div>
-        <label className={labelClass}>Confirm password</label>
-        <input type="password" value={form.confirm} onChange={set('confirm')} autoComplete="new-password" className={inputClass} />
-      </div>
-
-      {error && <p className="text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-2">{error}</p>}
-
-      <button
-        type="submit"
-        disabled={busy}
-        className="w-full rounded-lg bg-[var(--coffee-dark)] px-6 py-3 text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors disabled:opacity-50"
-      >
-        {busy ? 'Creating account…' : 'Create admin account'}
-      </button>
-    </form>
-  );
-};
-
-const Register2fa = ({ onBack }: { onBack: () => void }) => {
-  const ref = getSetupSecret();
-  if (!ref) return null;
-  const otp = otpauthURL(ref.username, ref.totpSecret);
-  return (
-    <div className="space-y-5">
-      <div className="flex items-start gap-4 bg-green-50 border border-green-200 rounded-lg p-4">
-        <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
-        <div className="text-sm text-[var(--text-medium)]">
-          <p className="font-semibold text-[var(--text-dark)] mb-1">Account created</p>
-          <p className="mb-1">
-            Scan this code with your authenticator app. You'll need the 6-digit code when you sign in.
-          </p>
-          <p className="text-xs text-[var(--text-light)] break-all font-mono">{ref.totpSecret}</p>
-        </div>
-      </div>
-      <div className="flex justify-center">
-        <QrCode value={otp} size={160} />
-      </div>
-      <div className="bg-[var(--cream)] border border-[var(--coffee-accent)]/30 rounded-lg p-4 text-center">
-        <p className="text-xs text-[var(--text-light)] mb-1">Account</p>
-        <p className="font-bold text-[var(--coffee-dark)]">{ref.username}</p>
-      </div>
-      <button
-        onClick={onBack}
-        className="w-full rounded-lg bg-[var(--coffee-dark)] px-6 py-3 text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors"
-      >
-        Continue to sign in
-      </button>
-    </div>
   );
 };
 
@@ -412,8 +309,6 @@ const AdminLogin = () => {
 
   const modeTitle: Record<Mode, { title: string; sub: string }> = {
     login: { title: 'Admin Login', sub: 'Step 1 of 2 · Credentials' },
-    register: { title: 'Create Admin Account', sub: 'Register to manage the school' },
-    register2fa: { title: 'Set Up 2FA', sub: 'Protect your admin account' },
     forgot: { title: 'Recover Password', sub: 'Get back into your account' },
     'forgot-reset': { title: 'Reset Password', sub: 'Set a new password' },
   };
@@ -445,7 +340,6 @@ const AdminLogin = () => {
   };
 
   const iconFor = (): React.ReactNode => {
-    if (mode === 'register' || mode === 'register2fa') return <UserPlus className="h-6 w-6 text-white" />;
     if (mode === 'forgot' || mode === 'forgot-reset') return <Mail className="h-6 w-6 text-white" />;
     return <KeyRoundIcon className="h-6 w-6 text-white" />;
   };
@@ -509,13 +403,6 @@ const AdminLogin = () => {
               <div className="mt-5 border-t border-[var(--cream)] pt-5 space-y-2.5 text-sm">
                 <Link
                   to="#"
-                  onClick={() => switchMode('register')}
-                  className="block w-full rounded-lg border border-[var(--coffee-accent)] px-6 py-3 text-center font-semibold text-[var(--coffee-dark)] hover:bg-[var(--cream)] transition-colors"
-                >
-                  Register new admin
-                </Link>
-                <Link
-                  to="#"
                   onClick={() => switchMode('forgot')}
                   className="block w-full text-center text-[var(--coffee-light)] font-semibold hover:underline"
                 >
@@ -523,27 +410,6 @@ const AdminLogin = () => {
                 </Link>
               </div>
             )}
-          </>
-        )}
-
-        {mode === 'register' && (
-          <>
-            <RegisterMode onDone={() => setMode('register2fa')} />
-            <div className="mt-5 text-center">
-              <Link
-                to="#"
-                onClick={() => switchMode('login')}
-                className="text-sm text-[var(--coffee-light)] font-semibold hover:underline"
-              >
-                Already have an account? Sign in
-              </Link>
-            </div>
-          </>
-        )}
-
-        {mode === 'register2fa' && (
-          <>
-            <Register2fa onBack={() => switchMode('login')} />
           </>
         )}
 

@@ -16,6 +16,8 @@ services:
         fromDatabase:
           name: barista-db
           property: connectionString
+      - key: ADMIN_USERS
+        sync: false
 
 databases:
   - name: barista-db
