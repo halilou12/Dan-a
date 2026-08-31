@@ -7,16 +7,15 @@ services:
     healthCheckPath: /api/health
     buildCommand: npm run build
     startCommand: npm start
-    disk:
-      name: barista-data
-      mountPath: /var/data
-      sizeGB: 1
     envVars:
       - key: NODE_VERSION
         value: 20.19.5
-      - key: DATABASE_PATH
-        value: /var/data/ksb.db
-      - key: UPLOAD_DIR
-        value: /var/data/uploads/gallery
       - key: JWT_SECRET
         generateValue: true
+
+databases:
+  - name: barista-db
+    plan: free
+    region: frankfurt
+    databaseName: barista
+    user: barista

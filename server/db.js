@@ -1,23 +1,32 @@
-import Database from 'better-sqlite3';
+import pg from 'pg';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import fs from 'node:fs';
+
+const { Pool } = pg;
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', 'data');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
-const DB_PATH = process.env.DATABASE_PATH || path.join(DATA_DIR, 'ksb.db');
 
-if (!fs.existsSync(DATA_DIR)) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
+const connectionString =
+  process.env.DATABASE_URL ||
+  'postgres://postgres:postgres@localhost:5432/postgres';
+
+export const pool = new Pool({
+  connectionString,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+});
+
+async function initSchema() {
+  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
+  await pool.query(schema);
 }
 
-const db = new Database(DB_PATH);
-db.pragma('journal_mode = WAL');
-db.pragma('foreign_keys = ON');
+initSchema().catch((err) => {
+  console.error('Failed to apply database schema:', err);
+  process.exit(1);
+});
 
-// Apply the schema on every startup (CREATE IF NOT EXISTS is idempotent).
-const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-db.exec(schema);
-
-export default db;
+export default {
+  query: (text, params) => pool.query(text, params),
+};
