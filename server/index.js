@@ -12,6 +12,25 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 4000;
 
+// Startup diagnostics — help confirm what the running build has access to.
+if (process.env.DATABASE_URL) {
+  try {
+    const dbHost = new URL(process.env.DATABASE_URL).host;
+    console.log(`[startup] DATABASE_URL is set (host: ${dbHost})`);
+  } catch {
+    console.log('[startup] DATABASE_URL is set (could not parse host)');
+  }
+} else {
+  console.warn(
+    '[startup] DATABASE_URL is NOT set — DB calls will fall back to localhost and fail on Render.',
+  );
+}
+console.log(
+  `[startup] dist/ present: ${fs.existsSync(
+    path.join(__dirname, '..', 'dist', 'index.html'),
+  )}`,
+);
+
 app.use(express.json({ limit: '5mb' }));
 
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
