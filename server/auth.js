@@ -82,6 +82,19 @@ async function logActivity({ userId = null, username = null, action, entityType 
   }
 }
 
+const requireAuth = (req, res, next) => {
+  const header = req.headers.authorization || '';
+  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token) return res.status(401).json({ error: 'Unauthorized.' });
+  try {
+    const payload = jwt.verify(token, JWT_SECRET);
+    req.user = payload;
+    return next();
+  } catch {
+    return res.status(401).json({ error: 'Session expired. Please sign in again.' });
+  }
+};
+
 // Auth required: most recent admin activity, newest first.
 router.get('/activity', requireAuth, async (_req, res) => {
   try {
@@ -105,19 +118,6 @@ router.get('/activity', requireAuth, async (_req, res) => {
     res.status(500).json({ error: 'Something went wrong.' });
   }
 });
-
-const requireAuth = (req, res, next) => {
-  const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'Unauthorized.' });
-  try {
-    const payload = jwt.verify(token, JWT_SECRET);
-    req.user = payload;
-    return next();
-  } catch {
-    return res.status(401).json({ error: 'Session expired. Please sign in again.' });
-  }
-};
 
 // Seed the team of administrators (the only people allowed to log in and manage
 // the project). Reads ADMIN_USERS as a JSON array: [{username, email, password}].
