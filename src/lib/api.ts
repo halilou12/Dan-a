@@ -124,6 +124,40 @@ export const regenerateTotp = (token: string) =>
     token,
   });
 
+export const getBootstrapStatus = () =>
+  request<{ canSetup: boolean }>('/bootstrap-status');
+
+export const bootstrapAdmin = (input: {
+  username: string;
+  email: string;
+  password: string;
+}) =>
+  request<RegisterResponse>('/bootstrap', {
+    method: 'POST',
+    body: input,
+  });
+
+export const listAdminUsers = (token: string) =>
+  request<{ users: AdminUser[] }>('/users', { token });
+
+export const addAdminUser = (
+  token: string,
+  input: { username: string; email: string; password: string },
+) =>
+  request<RegisterResponse>('/users', {
+    method: 'POST',
+    body: input,
+    token,
+  });
+
+export const deleteAdminUser = (token: string, id: string | number) =>
+  request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE', token });
+
+// Permanently delete a student from the server DB so their QR codes stop
+// verifying. Cascades remove their enrollments, assessments and certificates.
+export const deleteStudentOnServer = (token: string, id: string) =>
+  request<{ ok: boolean }>(`/students/${id}`, { method: 'DELETE', token });
+
 const GALLERY_BASE = '/api/gallery';
 
 export const uploadGalleryImage = async (

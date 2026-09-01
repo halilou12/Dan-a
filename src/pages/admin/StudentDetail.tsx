@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Award,
@@ -10,10 +10,11 @@ import {
   ShieldX,
   ClipboardList,
   Printer,
+  Trash2,
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
 import CertificateDocument from '../../components/CertificateDocument';
-import { syncCertificate } from '../../lib/api';
+import { syncCertificate, deleteStudentOnServer } from '../../lib/api';
 import { getToken } from '../../lib/auth';
 import {
   useStore,
@@ -31,6 +32,7 @@ import {
   graduateStudent,
   issueCertificate,
   revokeCertificate,
+  deleteStudent,
 } from '../../lib/store';
 import type { Grade } from '../../lib/store';
 
@@ -377,6 +379,7 @@ const ProgramCard = ({ studentId, programId }: { studentId: string; programId: s
 
 const StudentDetail = () => {
   const { studentId } = useParams();
+  const navigate = useNavigate();
   const data = useStore();
   const student = data.students.find((s) => s.id === studentId);
 
@@ -396,6 +399,23 @@ const StudentDetail = () => {
     );
   }
 
+  const doDeleteStudent = async () => {
+    const confirmed = window.confirm(
+      `Delete ${student.fullName} (${student.id})? This permanently removes their enrollments, assessments and certificates — their QR code will stop verifying.`,
+    );
+    if (!confirmed) return;
+    const adminToken = getToken();
+    deleteStudent(student.id);
+    if (adminToken) {
+      try {
+        await deleteStudentOnServer(adminToken, student.id);
+      } catch {
+        // Local removal already applied; server record could not be deleted.
+      }
+    }
+    navigate('/admin', { replace: true });
+  };
+
   const doEnroll = () => {
     if (!enrollChoice) {
       setEnrollNotice({ kind: 'error', text: 'Select a training program.' });
@@ -412,6 +432,15 @@ const StudentDetail = () => {
       <Link to="/admin" className="inline-flex items-center gap-2 text-[var(--coffee-light)] font-semibold hover:underline mb-6">
         <ArrowLeft className="h-4 w-4" /> Back to dashboard
       </Link>
+
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
+        <button
+          onClick={doDeleteStudent}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-50 transition-colors sm:ml-auto"
+        >
+          <Trash2 className="h-4 w-4" /> Delete student
+        </button>
+      </div>
 
       <div className="bg-white rounded-2xl shadow-md border border-[var(--coffee-accent)]/20 p-6 sm:p-8 mb-8">
         <div className="flex flex-col sm:flex-row gap-6">

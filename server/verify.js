@@ -290,4 +290,18 @@ router.post('/admin/certificates', requireAuth, async (req, res) => {
   }
 });
 
+// Admin-only: permanently delete a student. Foreign-key cascades remove their
+// enrollments, assessments and certificates, so their QR stops verifying.
+router.delete('/admin/students/:id', requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id || '').trim();
+    const { rowCount } = await db.query('DELETE FROM students WHERE id = $1', [id]);
+    if (rowCount === 0) return res.status(404).json({ error: 'Student not found.' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('delete student error:', err);
+    res.status(500).json({ error: 'Failed to delete student.' });
+  }
+});
+
 export { router as verifyRouter };

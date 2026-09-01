@@ -11,17 +11,22 @@ import {
   KeyRound,
   RefreshCw,
   Image,
+  Trash2,
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
 import {
   logout,
   changePassword,
   getAccount,
+  getToken,
   otpauthURL,
   regenerate2fa,
   fetchTotpSecret,
 } from '../../lib/auth';
-import { useStore, programById, enrollmentsOf } from '../../lib/store';
+import { listAdminUsers, addAdminUser, deleteAdminUser, deleteStudentOnServer } from '../../lib/api';
+import type { AdminUser } from '../../lib/api';
+import { useStore, programById, enrollmentsOf, deleteStudent } from '../../lib/store';
+import type { Student } from '../../lib/store';
 
 const statusStyles: Record<string, string> = {
   active: 'bg-amber-100 text-amber-800',
@@ -77,6 +82,81 @@ const AdminDashboard = () => {
     if (!next) return;
     setSecret(next.secret);
     setShow2fa(true);
+  };
+
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [newAdmin, setNewAdmin] = useState({ username: '', email: '', password: '', confirm: '' });
+  const [teamMsg, setTeamMsg] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
+
+  const loadAdmins = async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await listAdminUsers(token);
+      setAdmins(res.users);
+    } catch {
+      setAdmins([]);
+    }
+  };
+
+  useEffect(() => {
+    loadAdmins();
+  }, []);
+
+  const doAddAdmin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const token = getToken();
+    if (!token) return;
+    setTeamMsg(null);
+    if (newAdmin.password.length < 8) {
+      setTeamMsg({ kind: 'error', text: 'Password must be at least 8 characters.' });
+      return;
+    }
+    if (newAdmin.password !== newAdmin.confirm) {
+      setTeamMsg({ kind: 'error', text: 'Password confirmation does not match.' });
+      return;
+    }
+    try {
+      await addAdminUser(token, {
+        username: newAdmin.username.trim(),
+        email: newAdmin.email.trim(),
+        password: newAdmin.password,
+      });
+      setNewAdmin({ username: '', email: '', password: '', confirm: '' });
+      setTeamMsg({ kind: 'success', text: 'Team member added.' });
+      loadAdmins();
+    } catch (err) {
+      setTeamMsg({ kind: 'error', text: (err as Error).message });
+    }
+  };
+
+  const doDeleteStudent = async (student: Student) => {
+    const token = getToken();
+    const confirmed = window.confirm(
+      `Delete ${student.fullName} (${student.id})? This permanently removes their enrollments, assessments and certificates — their QR code will stop verifying.`,
+    );
+    if (!confirmed) return;
+    deleteStudent(student.id);
+    if (token) {
+      try {
+        await deleteStudentOnServer(token, student.id);
+      } catch {
+        // Local removal already applied; server record could not be deleted.
+      }
+    }
+  };
+
+  const doDeleteAdmin = async (id: number, name: string) => {
+    const token = getToken();
+    if (!token) return;
+    if (!window.confirm(`Remove team member "${name}"? They will no longer be able to sign in.`)) return;
+    try {
+      await deleteAdminUser(token, id);
+      setTeamMsg({ kind: 'success', text: 'Team member removed.' });
+      loadAdmins();
+    } catch (err) {
+      setTeamMsg({ kind: 'error', text: (err as Error).message });
+    }
   };
 
   const graduated = students.filter((s) => s.status === 'graduated').length;
@@ -216,6 +296,98 @@ const AdminDashboard = () => {
 
       <section className="mb-12">
         <h2 className="text-2xl font-bold text-[var(--text-dark)] mb-6 flex items-center gap-2">
+          <ShieldCheck className="h-6 w-6 text-[var(--coffee-light)]" /> Team Members
+        </h2>
+        <div className="bg-white rounded-xl p-6 shadow-md border border-[var(--coffee-accent)]/20">
+          <p className="text-sm text-[var(--text-medium)] mb-5">
+            Only the people listed here can sign in and manage the portal. Visitors stay read-only.
+          </p>
+          {teamMsg && (
+            <p className={`text-sm rounded-lg px-4 py-2 mb-4 border ${
+              teamMsg.kind === 'success'
+                ? 'bg-green-50 border-green-200 text-green-800'
+                : 'bg-red-50 border-red-200 text-red-800'
+            }`}>
+              {teamMsg.text}
+            </p>
+          )}
+          <ul className="mb-6 divide-y divide-[var(--cream)]">
+            {admins.map((u) => (
+              <li key={u.id} className="flex items-center justify-between gap-3 py-3">
+                <div className="min-w-0">
+                  <p className="font-semibold text-[var(--text-dark)] truncate">
+                    {u.username}
+                    <span className="ml-2 text-xs font-bold text-[var(--coffee-light)] uppercase">{u.role}</span>
+                  </p>
+                  <p className="text-xs text-[var(--text-medium)] truncate">{u.email}</p>
+                </div>
+                <button
+                  onClick={() => doDeleteAdmin(u.id, u.username)}
+                  disabled={u.username === account?.username}
+                  title={u.username === account?.username ? 'You cannot remove yourself' : 'Remove'}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <Trash2 className="h-3.5 w-3.5" /> Remove
+                </button>
+              </li>
+            ))}
+          </ul>
+          <h3 className="font-bold text-[var(--text-dark)] mb-4 flex items-center gap-2">
+            <UserPlus className="h-5 w-5 text-[var(--coffee-light)]" /> Add a team member
+          </h3>
+          <form onSubmit={doAddAdmin} className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="text"
+                value={newAdmin.username}
+                onChange={(e) => setNewAdmin({ ...newAdmin, username: e.target.value })}
+                placeholder="Username"
+                autoComplete="off"
+                required
+                className="w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]"
+              />
+              <input
+                type="email"
+                value={newAdmin.email}
+                onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                placeholder="Email (for password recovery)"
+                autoComplete="off"
+                required
+                className="w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <input
+                type="password"
+                value={newAdmin.password}
+                onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                placeholder="Password (min 8 characters)"
+                autoComplete="new-password"
+                required
+                className="w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]"
+              />
+              <input
+                type="password"
+                value={newAdmin.confirm}
+                onChange={(e) => setNewAdmin({ ...newAdmin, confirm: e.target.value })}
+                placeholder="Confirm password"
+                autoComplete="new-password"
+                required
+                className="w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]"
+              />
+            </div>
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--coffee-dark)] px-5 py-2.5 text-white text-sm font-semibold hover:bg-[var(--coffee-medium)] transition-colors"
+            >
+              <UserPlus className="h-4 w-4" /> Add team member
+            </button>
+          </form>
+        </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold text-[var(--text-dark)] mb-6 flex items-center gap-2">
           <Users className="h-6 w-6 text-[var(--coffee-light)]" /> Students
         </h2>
         <div className="bg-white rounded-xl shadow-md border border-[var(--coffee-accent)]/20 overflow-hidden">
@@ -270,10 +442,17 @@ const AdminDashboard = () => {
                           {certs.length}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <Link to={`/admin/students/${s.id}`} className="text-[var(--coffee-light)] font-semibold hover:underline">
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <Link to={`/admin/students/${s.id}`} className="text-[var(--coffee-light)] font-semibold hover:underline mr-4">
                           View
                         </Link>
+                        <button
+                          onClick={() => doDeleteStudent(s)}
+                          title="Delete student"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1 text-xs font-semibold text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </button>
                       </td>
                     </tr>
                   );

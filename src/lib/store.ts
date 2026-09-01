@@ -653,4 +653,17 @@ export const removeGalleryItem = (id: number): void => {
   commit((d) => ({ ...d, gallery: d.gallery.filter((g) => g.id !== id) }));
 };
 
+// Delete a student and everything tied to them (enrollments, assessments,
+// certificates). Use with care — this also makes any previously issued QR code
+// stop verifying.
+export const deleteStudent = (studentId: string): void => {
+  commit((d) => ({
+    ...d,
+    students: d.students.filter((s) => s.id !== studentId),
+    enrollments: d.enrollments.filter((e) => e.studentId !== studentId),
+    assessments: d.assessments.filter((a) => a.studentId !== studentId),
+    certificates: d.certificates.filter((c) => c.studentId !== studentId),
+  }));
+};
+
 export const useStore = (): StoreData => useSyncExternalStore(subscribe, getSnapshot);
