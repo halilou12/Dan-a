@@ -3,19 +3,19 @@ import { Mail, Phone, MapPin } from 'lucide-react';
 const Contact = () => {
   const team = [
     {
-      name: 'Team Member One',
-      position: 'Head Barista',
-      src: '/images/IMG-20260408-WA0013.jpg',
+      name: 'Ntwari Alizwani',
+      position: 'Founder',
+      src: '/images/Founder.png',
     },
     {
-      name: 'Team Member Two',
-      position: 'Coffee Trainer',
-      src: '/images/IMG-20260408-WA0014.jpg',
+      name: 'Sibomana Assouman',
+      position: 'Chief Executive Officer',
+      src: '/images/CEO.png',
     },
     {
-      name: 'Team Member Three',
-      position: 'Beverage Specialist',
-      src: '/images/IMG-20260408-WA0027.jpg',
+      name: 'Uwimana Arafat',
+      position: 'Trainer',
+      src: '/images/Trainner.png',
     },
   ];
 
