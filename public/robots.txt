@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://barista-api-xufj.onrender.com/sitemap.xml
