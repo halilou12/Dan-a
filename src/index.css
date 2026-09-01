@@ -78,6 +78,11 @@
 }
 
 @media print {
+  @page {
+    size: A4 landscape;
+    margin: 0;
+  }
+
   body {
     background: #ffffff;
   }
@@ -86,19 +91,26 @@
     display: none !important;
   }
 
-  .ksb-print-page {
-    position: absolute;
+  /* When printing a certificate (Print button adds .ksb-print-active to that
+     certificate only), hide the entire page and pin it to fit one paper. */
+  body *:not(.ksb-print-active):not(.ksb-print-active *) {
+    visibility: hidden;
+  }
+
+  .ksb-print-active {
+    visibility: visible;
+    position: fixed;
     left: 0;
     top: 0;
     width: 100%;
-    margin: 0;
-    padding: 0;
-  }
-
-  .ksb-certificate {
     box-shadow: none !important;
+    border-radius: 0 !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+  }
+
+  .ksb-print-active .ksb-certificate-paper {
+    border-radius: 0 !important;
   }
 
   .print-break-avoid {

@@ -61,6 +61,18 @@ const CertificateCard = ({ certificate, fullName, programTitle, weeks }: { certi
     setNotice({ kind: 'success', text: `Certificate ${certificate.id} revoked. The QR code now shows it as invalid.` });
   };
 
+  const doPrint = () => {
+    const node = document.getElementById(`ksb-certificate-${certificate.id}`);
+    if (!node) return;
+    node.classList.add('ksb-print-active');
+    const cleanup = () => {
+      node.classList.remove('ksb-print-active');
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+  };
+
   return (
     <div className="rounded-xl border border-[var(--coffee-accent)]/30 bg-[var(--cream-light)] p-5 print-break-avoid">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
@@ -103,7 +115,7 @@ const CertificateCard = ({ certificate, fullName, programTitle, weeks }: { certi
               Open verification page
             </a>
             <button
-              onClick={() => window.print()}
+              onClick={doPrint}
               className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--coffee-accent)] px-4 py-2 text-xs font-semibold text-[var(--coffee-dark)] hover:bg-[var(--cream)] transition-colors"
             >
               <Printer className="h-3.5 w-3.5" /> Print

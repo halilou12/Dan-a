@@ -21,44 +21,52 @@ const CertificateDocument = ({
   token,
 }: CertificateDocumentProps) => {
   return (
-    <div id="ksb-certificate" className="ksb-certificate">
-      {/* The certificate.png is the certificate itself. Its intrinsic ratio is 607:422. */}
-      <div
-        className="relative w-full"
-        style={{
-          aspectRatio: '607 / 422',
-          backgroundImage: 'url(/images/certificate.png)',
-          backgroundSize: '100% 100%',
-          backgroundRepeat: 'no-repeat',
-          borderRadius: '8px',
-          boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
-        }}
-      >
-        {/* Student photo — top-left corner */}
-        {photo && (
-          <div
-            className="absolute overflow-hidden rounded-full border-2 border-white shadow"
-            style={{
-              left: '5%',
-              top: '8%',
-              width: '17%',
-              aspectRatio: '1 / 1',
-            }}
-          >
-            <img src={photo} alt={fullName} className="h-full w-full object-cover" />
-          </div>
-        )}
+    <div
+      id={`ksb-certificate-${certId}`}
+      className="ksb-certificate relative w-full"
+      style={{
+        aspectRatio: '607 / 422',
+        borderRadius: '8px',
+        boxShadow: '0 10px 25px rgba(0,0,0,0.25)',
+        overflow: 'hidden',
+      }}
+    >
+      {/* certificate.png IS the certificate paper. Rendered as a real <img>,
+          never a CSS background, so it always prints — even when the browser
+          dialog has "background graphics" turned off. */}
+      <img
+        src="/images/certificate.png"
+        alt=""
+        aria-hidden
+        className="ksb-certificate-paper absolute inset-0 h-full w-full"
+        style={{ objectFit: 'fill', display: 'block' }}
+      />
 
-        {/* QR code — top-right corner */}
-        <div className="absolute flex flex-col items-center" style={{ right: '4%', top: '7%' }}>
-          <QrCode value={verificationURL(token)} size={80} />
-          <p
-            className="text-center text-white"
-            style={{ fontSize: '8px', textShadow: '1px 1px 1px rgba(0,0,0,0.7)' }}
-          >
-            Scan to verify
-          </p>
+      {/* Student photo — top-left corner */}
+      {photo && (
+        <div
+          className="absolute overflow-hidden rounded-full border-2 border-white shadow"
+          style={{
+            left: '5%',
+            top: '7%',
+            width: '18%',
+            aspectRatio: '1 / 1',
+          }}
+        >
+          <img src={photo} alt={fullName} className="h-full w-full object-cover" />
         </div>
+      )}
+
+      {/* QR code — top-right corner */}
+      <div className="absolute flex flex-col items-center" style={{ right: '4%', top: '6%' }}>
+        <QrCode value={verificationURL(token)} size={110} />
+        <p
+          className="text-center text-white"
+          style={{ fontSize: '9px', textShadow: '1px 1px 1px rgba(0,0,0,0.7)' }}
+        >
+          Scan to verify
+        </p>
+      </div>
 
         {/* Student name — under "proudly presented to" (center body) */}
         <div className="absolute left-0 w-full text-center" style={{ top: '50%' }}>
@@ -98,7 +106,6 @@ const CertificateDocument = ({
         <div className="absolute right-[6%] text-white text-right" style={{ bottom: '9%' }}>
           <p style={{ fontSize: 'clamp(9px, 1.4vw, 14px)' }}>{issueDate}</p>
         </div>
-      </div>
     </div>
   );
 };
