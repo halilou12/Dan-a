@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft, UserPlus, Image as ImageIcon } from 'lucide-react';
-import { registerStudent } from '../../lib/store';
+import { registerStudent, reloadFromServer } from '../../lib/store';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-[var(--text-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]';
@@ -19,6 +19,10 @@ const RegisterStudent = () => {
   });
   const [photo, setPhoto] = useState<string | null>(null);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    reloadFromServer();
+  }, []);
 
   const set = (field: keyof typeof form) => (
     e: React.ChangeEvent<HTMLInputElement>,

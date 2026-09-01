@@ -1,4 +1,7 @@
 import { useSyncExternalStore } from 'react';
+import { getToken } from './auth';
+import { fetchDataSnapshot, pushDataSnapshot } from './api';
+import type { DataSnapshot } from './api';
 
 export type StudentStatus = 'active' | 'graduated' | 'withdrawn';
 export type Grade = 'Competent' | 'Not yet competent';
@@ -418,6 +421,51 @@ const seed = (): StoreData => ({
 let data: StoreData | null = null;
 const listeners = new Set<() => void>();
 
+// Shared-data sync: every mutation is pushed to the server so all admins work
+// on one copy. localStorage stays as the offline cache / guest fallback.
+let pushQueued = false;
+let pushInFlight = false;
+
+const persist = (next: StoreData): void => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // storage may be full or unavailable; keep in-memory state
+  }
+};
+
+const toPayload = (d: StoreData): Omit<DataSnapshot, 'serverHasData'> => ({
+  students: d.students,
+  enrollments: d.enrollments,
+  assessments: d.assessments,
+  certificates: d.certificates,
+  gallery: d.gallery,
+  counters: d.counters,
+});
+
+const runPush = async (): Promise<void> => {
+  if (pushInFlight || !pushQueued) return;
+  pushInFlight = true;
+  pushQueued = false;
+  try {
+    const token = getToken();
+    if (!token) return;
+    await pushDataSnapshot(token, toPayload(getData()));
+  } catch (err) {
+    pushQueued = true;
+    console.warn('Shared data could not be pushed:', err instanceof Error ? err.message : err);
+  } finally {
+    pushInFlight = false;
+    if (pushQueued) setTimeout(() => runPush(), 800);
+  }
+};
+
+const markDirty = (): void => {
+  if (pushQueued) return;
+  pushQueued = true;
+  runPush();
+};
+
 const load = (): StoreData => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -442,6 +490,23 @@ const getData = (): StoreData => {
   return data;
 };
 
+// Derive the next ID counters from existing records so newly created students
+// and certificates never collide with records that came from the shared server.
+const recomputeCounters = (parts: {
+  students: { id: string }[];
+  certificates: { id: string }[];
+}): StoreData['counters'] => {
+  let student = parts.students.reduce((max, s) => {
+    const m = /-(\d+)$/.exec(s.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  let cert = parts.certificates.reduce((max, c) => {
+    const m = /-(\d+)$/.exec(c.id);
+    return m ? Math.max(max, Number(m[1])) : max;
+  }, 0);
+  return { student, cert };
+};
+
 export const subscribe = (listener: () => void): (() => void) => {
   listeners.add(listener);
   return () => listeners.delete(listener);
@@ -452,12 +517,56 @@ export const getSnapshot = (): StoreData => getData();
 const commit = (mutate: (current: StoreData) => StoreData): void => {
   const next = mutate(getData());
   data = next;
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  } catch {
-    // storage may be full or unavailable; keep in-memory state
-  }
+  persist(next);
   listeners.forEach((l) => l());
+  markDirty();
+};
+
+export const getSyncState = (): ('idle' | 'pushing' | 'pending') => {
+  if (pushInFlight) return 'pushing';
+  if (pushQueued) return 'pending';
+  return 'idle';
+};
+
+// Pull the shared dataset from the server (or publish this browser's records
+// once as the baseline when the server is still empty). Call this on sign-in
+// and whenever you want the latest changes from your teammates.
+export const reloadFromServer = async (): Promise<void> => {
+  const token = getToken();
+  if (!token) return;
+  try {
+    const snap = await fetchDataSnapshot(token);
+    if (snap.serverHasData) {
+      const merged: StoreData = {
+        students: snap.students.map((s) => ({
+          ...s,
+          status: (s.status as StudentStatus) || 'active',
+        })),
+        enrollments: snap.enrollments,
+        assessments: snap.assessments.map((a) => ({
+          ...a,
+          grade: (a.grade as Grade) || 'Competent',
+        })),
+        certificates: snap.certificates.map((c) => ({
+          ...c,
+          status: (c.status as CertificateStatus) || 'valid',
+        })),
+        gallery: snap.gallery.length > 0 ? snap.gallery : getData().gallery,
+        counters: recomputeCounters({
+          students: snap.students,
+          certificates: snap.certificates,
+        }),
+      };
+      data = merged;
+      persist(merged);
+      listeners.forEach((l) => l());
+    } else {
+      // Server has nothing yet — seed it with what this browser currently has.
+      markDirty();
+    }
+  } catch (err) {
+    console.warn('Could not load shared data:', err instanceof Error ? err.message : err);
+  }
 };
 
 export const today = (): string => new Date().toISOString().slice(0, 10);

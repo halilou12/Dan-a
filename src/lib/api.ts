@@ -153,6 +153,69 @@ export const addAdminUser = (
 export const deleteAdminUser = (token: string, id: string | number) =>
   request<{ ok: boolean }>(`/users/${id}`, { method: 'DELETE', token });
 
+// Recent administrator activity (audit trail) — shows everyone's changes.
+export interface Activity {
+  id: number;
+  userId: number | null;
+  username: string | null;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  detail?: unknown;
+  createdAt: string;
+}
+
+export const listActivity = (token: string) =>
+  request<{ activities: Activity[] }>('/activity', { token });
+
+// Shared dataset — the single copy of student/enrollment/assessment/
+// certificate/gallery records that every admin sees.
+export interface DataSnapshot {
+  serverHasData: boolean;
+  students: {
+    id: string;
+    fullName: string;
+    nationalId: string;
+    dob: string;
+    email: string;
+    phone: string;
+    photo: string | null;
+    status: string;
+    createdAt: string;
+  }[];
+  enrollments: { studentId: string; programId: string; enrolledDate: string }[];
+  assessments: {
+    id: string;
+    studentId: string;
+    programId: string;
+    module: string;
+    grade: string;
+    score: number;
+    assessedDate: string;
+    assessor: string;
+  }[];
+  certificates: {
+    id: string;
+    studentId: string;
+    programId: string;
+    token: string;
+    issueDate: string;
+    status: string;
+    revokedDate?: string;
+    revokedReason?: string;
+  }[];
+  gallery: { id: number; alt: string; category: string; src: string }[];
+  counters: { student: number; cert: number };
+}
+
+export const fetchDataSnapshot = (token: string) =>
+  request<DataSnapshot>('/data', { token });
+
+export const pushDataSnapshot = (
+  token: string,
+  payload: Omit<DataSnapshot, 'serverHasData'>,
+) => request<{ ok: boolean }>('/data', { method: 'POST', body: payload, token });
+
 // Permanently delete a student from the server DB so their QR codes stop
 // verifying. Cascades remove their enrollments, assessments and certificates.
 export const deleteStudentOnServer = (token: string, id: string) =>

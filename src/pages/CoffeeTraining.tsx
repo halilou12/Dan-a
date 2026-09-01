@@ -91,30 +91,29 @@ const CoffeeTraining = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {introCourses.map((course) => (
-            <div key={course.title} className={`bg-white rounded-xl p-6 shadow-md border border-[var(--coffee-accent)]/20 card-hover ${course.video ? 'md:col-span-2' : ''}`}>
+            <div key={course.title} className={`relative flex items-end bg-white rounded-xl overflow-hidden shadow-md border border-[var(--coffee-accent)]/20 card-hover min-h-[280px] ${course.video ? 'md:col-span-2' : ''}`}>
               {course.video ? (
-                <div className="rounded-lg overflow-hidden mb-4 bg-black">
-                  <video
-                    className="w-full aspect-video object-cover"
-                    controls
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    preload="metadata"
-                    poster={course.image}
-                  >
-                    <source src={course.video} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
+                <video
+                  className="absolute inset-0 w-full h-full object-cover"
+                  controls
+                  autoPlay
+                  loop
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster={course.image}
+                >
+                  <source src={course.video} type="video/mp4" />
+                  Your browser does not support the video tag.
+                </video>
               ) : (
-                <div className="w-12 h-12 bg-gradient-to-br from-[var(--coffee-accent)] to-[var(--coffee-light)] rounded-lg flex items-center justify-center mb-4 overflow-hidden">
-                  <img src={course.image} alt={course.title} className="w-full h-full object-cover" />
-                </div>
+                <img src={course.image} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
               )}
-              <h3 className="text-xl font-bold text-[var(--text-dark)] mb-3">{course.title}</h3>
-              <p className="text-[var(--text-medium)]">{course.description}</p>
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+              <div className="relative p-6 pt-20 w-full text-white">
+                <h3 className="text-xl font-bold mb-3">{course.title}</h3>
+                <p className="text-white/90">{course.description}</p>
+              </div>
             </div>
           ))}
         </div>
@@ -160,12 +159,13 @@ const CoffeeTraining = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {specialtyMethods.map((method) => (
-            <div key={method.name} className="bg-gradient-to-br from-[var(--coffee-dark)] to-[var(--coffee-medium)] rounded-xl p-6 text-white card-hover">
-              <div className="w-12 h-12 rounded-lg overflow-hidden mb-3">
-                <img src={method.image} alt={method.name} className="w-full h-full object-cover" />
+            <div key={method.name} className="relative flex items-end bg-gradient-to-br from-[var(--coffee-dark)] to-[var(--coffee-medium)] rounded-xl overflow-hidden card-hover min-h-[260px] text-white">
+              <img src={method.image} alt={method.name} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+              <div className="relative p-6 pt-20 w-full">
+                <h3 className="text-xl font-bold mb-3">{method.name}</h3>
+                <p className="text-gray-200">{method.description}</p>
               </div>
-              <h3 className="text-xl font-bold mb-3">{method.name}</h3>
-              <p className="text-gray-200">{method.description}</p>
             </div>
           ))}
         </div>

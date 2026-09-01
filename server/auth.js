@@ -69,6 +69,43 @@ const randomToken = () =>
 const hash64 = (value) =>
   crypto.createHash('sha256').update(value).digest('hex');
 
+// Append a row to the audit trail (never throws to callers).
+async function logActivity({ userId = null, username = null, action, entityType = null, entityId = null, detail = null }) {
+  try {
+    await db.query(
+      `INSERT INTO activity_logs (user_id, username, action, entity_type, entity_id, detail)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [userId, username, action, entityType, entityId, detail ? JSON.stringify(detail) : null],
+    );
+  } catch (err) {
+    console.warn('logActivity error:', err.message || err);
+  }
+}
+
+// Auth required: most recent admin activity, newest first.
+router.get('/activity', requireAuth, async (_req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT * FROM activity_logs ORDER BY created_at DESC LIMIT 200',
+    );
+    res.json({
+      activities: rows.map((r) => ({
+        id: r.id,
+        userId: r.user_id,
+        username: r.username,
+        action: r.action,
+        entityType: r.entity_type,
+        entityId: r.entity_id,
+        detail: r.detail,
+        createdAt: r.created_at,
+      })),
+    });
+  } catch (err) {
+    console.error('activity error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
 const requireAuth = (req, res, next) => {
   const header = req.headers.authorization || '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : null;
@@ -213,6 +250,13 @@ router.post('/bootstrap', async (req, res) => {
        RETURNING *`,
       [uname, em, passwordHash, totpSecret],
     );
+    await logActivity({
+      userId: info.rows[0].id,
+      username: info.rows[0].username,
+      action: 'bootstrap_admin',
+      entityType: 'user',
+      entityId: uname,
+    });
     res.status(201).json({
       user: {
         id: String(info.rows[0].id),
@@ -272,6 +316,13 @@ router.post('/users', requireAuth, async (req, res) => {
        RETURNING *`,
       [uname, em, passwordHash, totpSecret],
     );
+    await logActivity({
+      userId: req.user.sub,
+      username: req.user.username,
+      action: 'add_admin',
+      entityType: 'user',
+      entityId: uname,
+    });
     res.status(201).json({ user: normalizeUser(info.rows[0]) });
   } catch (err) {
     console.error('add user error:', err);
@@ -293,6 +344,13 @@ router.delete('/users/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'You cannot remove the last administrator.' });
     }
     await db.query('DELETE FROM users WHERE id = $1', [id]);
+    await logActivity({
+      userId: req.user.sub,
+      username: req.user.username,
+      action: 'remove_admin',
+      entityType: 'user',
+      entityId: rows[0].username,
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('delete user error:', err);
@@ -367,6 +425,13 @@ router.post('/auth/verify-2fa', async (req, res) => {
     }
     clearAttempts(row.id);
     const token = signToken(row);
+    await logActivity({
+      userId: row.id,
+      username: row.username,
+      action: 'sign_in',
+      entityType: 'user',
+      entityId: String(row.id),
+    });
     res.json({
       ok: true,
       token,
@@ -475,6 +540,17 @@ router.post('/auth/reset-password', async (req, res) => {
     ]);
     await db.query('UPDATE reset_tokens SET used = TRUE WHERE id = $1', [resetRow.id]);
     clearAttempts(resetRow.user_id);
+    const { rows: actorRows } = await db.query(
+      'SELECT username FROM users WHERE id = $1',
+      [resetRow.user_id],
+    );
+    await logActivity({
+      userId: resetRow.user_id,
+      username: actorRows[0]?.username ?? null,
+      action: 'password_reset',
+      entityType: 'user',
+      entityId: String(resetRow.user_id),
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('reset-password error:', err);
@@ -498,6 +574,13 @@ router.post('/auth/change-password', requireAuth, async (req, res) => {
     }
     const passwordHash = bcrypt.hashSync(String(newPassword), 12);
     await db.query('UPDATE users SET password_hash = $1 WHERE id = $2', [passwordHash, row.id]);
+    await logActivity({
+      userId: row.id,
+      username: row.username,
+      action: 'change_password',
+      entityType: 'user',
+      entityId: String(row.id),
+    });
     res.json({ ok: true });
   } catch (err) {
     console.error('change-password error:', err);
@@ -524,6 +607,13 @@ router.post('/auth/regenerate-totp', requireAuth, async (req, res) => {
     if (rows.length === 0) return res.status(401).json({ error: 'Account no longer exists.' });
     const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
     await db.query('UPDATE users SET totp_secret = $1 WHERE id = $2', [totpSecret, rows[0].id]);
+    await logActivity({
+      userId: rows[0].id,
+      username: rows[0].username,
+      action: 'regenerate_2fa',
+      entityType: 'user',
+      entityId: String(rows[0].id),
+    });
     res.json({ totpSecret, username: rows[0].username });
   } catch (err) {
     console.error('regenerate-totp error:', err);

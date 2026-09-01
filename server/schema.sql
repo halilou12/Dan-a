@@ -33,6 +33,21 @@ CREATE TABLE IF NOT EXISTS reset_tokens (
 
 CREATE INDEX IF NOT EXISTS idx_reset_user ON reset_tokens(user_id);
 
+-- Audit trail: records who did what in the admin portal, so every
+-- administrator can see their teammates' actions.
+CREATE TABLE IF NOT EXISTS activity_logs (
+    id          BIGSERIAL PRIMARY KEY,
+    user_id     BIGINT,
+    username    TEXT,
+    action      TEXT      NOT NULL,
+    entity_type TEXT,
+    entity_id   TEXT,
+    detail      JSONB,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_time ON activity_logs(created_at DESC);
+
 -- Programs are a fixed catalog shared across all certificates.
 CREATE TABLE IF NOT EXISTS programs (
     id        TEXT PRIMARY KEY,
@@ -41,12 +56,18 @@ CREATE TABLE IF NOT EXISTS programs (
     modules   JSONB NOT NULL
 );
 
--- Certificate holders (public fields only; sensitive data stays client-side).
+-- Certificate holders. All administrators share the same records, so the
+-- full registration detail is stored here too (previously client-only).
 CREATE TABLE IF NOT EXISTS students (
-    id        TEXT PRIMARY KEY,
-    full_name TEXT NOT NULL,
-    photo     TEXT,
-    status    TEXT NOT NULL DEFAULT 'active'
+    id          TEXT PRIMARY KEY,
+    full_name   TEXT NOT NULL,
+    national_id TEXT,
+    dob         TEXT,
+    email       TEXT,
+    phone       TEXT,
+    photo       TEXT,
+    status      TEXT NOT NULL DEFAULT 'active',
+    created_at  TEXT
 );
 
 CREATE TABLE IF NOT EXISTS enrollments (
@@ -83,4 +104,11 @@ CREATE TABLE IF NOT EXISTS certificates (
 
 CREATE INDEX IF NOT EXISTS idx_cert_token ON certificates(token);
 CREATE INDEX IF NOT EXISTS idx_assessment_student ON assessments(student_id);
+
+-- Shared key/value storage (used for the public gallery list, which used to be
+-- kept separately in every admin's browser).
+CREATE TABLE IF NOT EXISTS app_meta (
+    key   TEXT PRIMARY KEY,
+    value JSONB NOT NULL
+);
 

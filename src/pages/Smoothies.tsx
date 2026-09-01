@@ -28,12 +28,13 @@ const Smoothies = () => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {smoothies.map((smoothie) => (
-            <div key={smoothie.name} className="bg-white rounded-xl p-6 shadow-md border border-[var(--coffee-accent)]/20 card-hover">
-              <div className="w-12 h-12 bg-gradient-to-br from-pink-400 to-red-500 rounded-lg flex items-center justify-center mb-4 text-white text-xl font-bold overflow-hidden">
-                <img src={smoothie.src} alt={smoothie.name} className="w-full h-full object-cover" />
+            <div key={smoothie.name} className="relative flex items-end bg-white rounded-xl overflow-hidden shadow-md border border-[var(--coffee-accent)]/20 card-hover min-h-[260px]">
+              <img src={smoothie.src} alt={smoothie.name} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+              <div className="relative p-6 pt-20 w-full text-white">
+                <h3 className="text-xl font-bold mb-2">{smoothie.name}</h3>
+                <p className="text-white/90">{smoothie.description}</p>
               </div>
-              <h3 className="text-xl font-bold text-[var(--text-dark)] mb-2">{smoothie.name}</h3>
-              <p className="text-[var(--text-medium)]">{smoothie.description}</p>
             </div>
           ))}
         </div>
@@ -45,12 +46,13 @@ const Smoothies = () => {
         </h2>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {mixedSmoothies.map((smoothie) => (
-            <div key={smoothie.name} className="bg-gradient-to-br from-[var(--coffee-accent)] to-[var(--coffee-light)] rounded-xl p-6 text-white card-hover">
-              <div className="w-12 h-12 rounded-lg overflow-hidden mb-3">
-                <img src={smoothie.src} alt={smoothie.name} className="w-full h-full object-cover" />
+            <div key={smoothie.name} className="relative flex items-end bg-gradient-to-br from-[var(--coffee-accent)] to-[var(--coffee-light)] rounded-xl overflow-hidden card-hover min-h-[260px] text-white">
+              <img src={smoothie.src} alt={smoothie.name} className="absolute inset-0 w-full h-full object-cover" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+              <div className="relative p-6 pt-20 w-full">
+                <h3 className="text-xl font-bold mb-2">{smoothie.name}</h3>
+                <p className="text-white/90">{smoothie.description}</p>
               </div>
-              <h3 className="text-xl font-bold mb-2">{smoothie.name}</h3>
-              <p className="text-white/90">{smoothie.description}</p>
             </div>
           ))}
         </div>

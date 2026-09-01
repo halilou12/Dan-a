@@ -12,6 +12,7 @@ import {
   RefreshCw,
   Image,
   Trash2,
+  History,
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
 import {
@@ -23,9 +24,21 @@ import {
   regenerate2fa,
   fetchTotpSecret,
 } from '../../lib/auth';
-import { listAdminUsers, addAdminUser, deleteAdminUser, deleteStudentOnServer } from '../../lib/api';
-import type { AdminUser } from '../../lib/api';
-import { useStore, programById, enrollmentsOf, deleteStudent } from '../../lib/store';
+import {
+  listAdminUsers,
+  addAdminUser,
+  deleteAdminUser,
+  deleteStudentOnServer,
+  listActivity,
+} from '../../lib/api';
+import type { AdminUser, Activity } from '../../lib/api';
+import {
+  useStore,
+  programById,
+  enrollmentsOf,
+  deleteStudent,
+  reloadFromServer,
+} from '../../lib/store';
 import type { Student } from '../../lib/store';
 
 const statusStyles: Record<string, string> = {
@@ -34,6 +47,27 @@ const statusStyles: Record<string, string> = {
   withdrawn: 'bg-gray-100 text-gray-600',
   valid: 'bg-green-100 text-green-800',
   revoked: 'bg-red-100 text-red-800',
+};
+
+const activityLabel: Record<string, string> = {
+  sign_in: 'Signed in',
+  change_password: 'Changed password',
+  password_reset: 'Reset password',
+  regenerate_2fa: 'Regenerated 2FA secret',
+  add_admin: 'Added team member',
+  remove_admin: 'Removed team member',
+  bootstrap_admin: 'Bootstrapped first admin',
+  issue_certificate: 'Issued certificate',
+  delete_student: 'Deleted student',
+};
+
+const formatActivity = (a: Activity) => {
+  let label = activityLabel[a.action] ?? a.action;
+  const detail = a.detail as { student?: string; program?: string } | null | undefined;
+  if (a.action === 'issue_certificate' && detail?.student) {
+    label += ` for ${detail.student} (${detail.program ?? ''})`;
+  }
+  return label;
 };
 
 const AdminDashboard = () => {
@@ -154,8 +188,38 @@ const AdminDashboard = () => {
       await deleteAdminUser(token, id);
       setTeamMsg({ kind: 'success', text: 'Team member removed.' });
       loadAdmins();
+      loadActivity();
     } catch (err) {
       setTeamMsg({ kind: 'error', text: (err as Error).message });
+    }
+  };
+
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [syncing, setSyncing] = useState(false);
+
+  const loadActivity = async () => {
+    const token = getToken();
+    if (!token) return;
+    try {
+      const res = await listActivity(token);
+      setActivities(res.activities);
+    } catch {
+      setActivities([]);
+    }
+  };
+
+  useEffect(() => {
+    loadActivity();
+    reloadFromServer();
+  }, []);
+
+  const doSync = async () => {
+    setSyncing(true);
+    try {
+      await reloadFromServer();
+      await loadActivity();
+    } finally {
+      setSyncing(false);
     }
   };
 
@@ -383,6 +447,61 @@ const AdminDashboard = () => {
               <UserPlus className="h-4 w-4" /> Add team member
             </button>
           </form>
+        </div>
+      </section>
+
+      <section className="mb-12">
+        <h2 className="text-2xl font-bold text-[var(--text-dark)] mb-2 flex items-center gap-2">
+          <History className="h-6 w-6 text-[var(--coffee-light)]" /> Recent Activity
+        </h2>
+        <p className="text-sm text-[var(--text-medium)] mb-6">
+          All administrators work on the same shared records — pull the latest changes from your teammates with
+          Refresh, and any edit anyone makes is saved to the shared database automatically. Every action by a team
+          member (sign-ins, password changes, certificates issued, students deleted, team changes) is recorded here so
+          nothing happens unnoticed.
+        </p>
+        <div className="bg-white rounded-xl shadow-md border border-[var(--coffee-accent)]/20 overflow-hidden">
+          <div className="p-3 border-b border-[var(--cream)] flex justify-end">
+            <button
+              onClick={doSync}
+              disabled={syncing}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--coffee-accent)] px-3 py-1.5 text-xs font-semibold text-[var(--coffee-dark)] hover:bg-[var(--cream)] transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin' : ''}`} />
+              {syncing ? 'Syncing…' : 'Refresh'}
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--cream)] text-left text-[var(--text-light)]">
+                  <th className="px-4 py-3 font-medium">Time</th>
+                  <th className="px-4 py-3 font-medium">User</th>
+                  <th className="px-4 py-3 font-medium">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="px-4 py-8 text-center text-[var(--text-light)]">
+                      No activity recorded yet.
+                    </td>
+                  </tr>
+                )}
+                {activities.map((a) => (
+                  <tr key={a.id} className="border-t border-[var(--cream)]">
+                    <td className="px-4 py-3 whitespace-nowrap text-xs text-[var(--text-medium)]">
+                      {new Date(a.createdAt).toLocaleString()}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-[var(--text-dark)]">
+                      {a.username ?? 'System'}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--text-medium)]">{formatActivity(a)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

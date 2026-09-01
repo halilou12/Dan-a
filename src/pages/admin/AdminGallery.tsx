@@ -1,7 +1,7 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Trash2, ImagePlus, Loader2 } from 'lucide-react';
-import { useStore, addGalleryItem, removeGalleryItem } from '../../lib/store';
+import { useStore, addGalleryItem, removeGalleryItem, reloadFromServer } from '../../lib/store';
 import { uploadGalleryImage, deleteGalleryImage } from '../../lib/api';
 import { getToken } from '../../lib/auth';
 
@@ -17,6 +17,10 @@ const AdminGallery = () => {
   const [deleting, setDeleting] = useState<number | null>(null);
   const [notice, setNotice] = useState<{ kind: 'success' | 'error'; text: string } | null>(null);
   const [form, setForm] = useState({ alt: '', category: CATEGORIES[0] });
+
+  useEffect(() => {
+    reloadFromServer();
+  }, []);
 
   const handleFile = async (file: File) => {
     if (!token) {

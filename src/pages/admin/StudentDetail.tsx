@@ -1,6 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
-import {
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';import {
   ArrowLeft,
   Award,
   GraduationCap,
@@ -33,6 +32,7 @@ import {
   issueCertificate,
   revokeCertificate,
   deleteStudent,
+  reloadFromServer,
 } from '../../lib/store';
 import type { Grade } from '../../lib/store';
 
@@ -401,6 +401,10 @@ const StudentDetail = () => {
 
   const [enrollChoice, setEnrollChoice] = useState(availablePrograms[0]?.id ?? '');
   const [enrollNotice, setEnrollNotice] = useState<Notice | null>(null);
+
+  useEffect(() => {
+    reloadFromServer();
+  }, []);
 
   if (!student) {
     return (

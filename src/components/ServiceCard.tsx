@@ -13,17 +13,22 @@ const ServiceCard = ({ title, description, icon: Icon, image, link }: ServiceCar
   return (
     <Link
       to={link}
-      className="block bg-white rounded-xl p-6 shadow-md card-hover border border-[var(--coffee-accent)]/20"
+      className="group relative flex items-end bg-white rounded-xl overflow-hidden shadow-md card-hover border border-[var(--coffee-accent)]/20 min-h-[220px]"
     >
-      <div className="w-14 h-14 bg-gradient-to-br from-[var(--coffee-accent)] to-[var(--coffee-light)] rounded-lg flex items-center justify-center mb-4 overflow-hidden">
-        {image ? (
-          <img src={image} alt={title} className="w-full h-full object-cover" />
-        ) : (
-          <Icon className="h-7 w-7 text-white" />
-        )}
+      {image ? (
+        <>
+          <img src={image} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+        </>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[var(--coffee-accent)] to-[var(--coffee-light)] flex items-center justify-center">
+          <Icon className="h-12 w-12 text-white" />
+        </div>
+      )}
+      <div className="relative p-6 pt-20 w-full">
+        <h3 className="text-lg font-bold text-white mb-1">{title}</h3>
+        <p className="text-white/85 text-sm leading-relaxed">{description}</p>
       </div>
-      <h3 className="text-lg font-bold text-[var(--text-dark)] mb-2">{title}</h3>
-      <p className="text-[var(--text-medium)] text-sm">{description}</p>
     </Link>
   );
 };

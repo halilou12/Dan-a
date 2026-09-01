@@ -91,13 +91,14 @@
     display: none !important;
   }
 
-  /* When printing a certificate (Print button adds .ksb-print-active to that
-     certificate only), hide the entire page and pin it to fit one paper. */
-  body *:not(.ksb-print-active):not(.ksb-print-active *) {
+  /* When printing a certificate (the Print button adds .ksb-print-active to
+     that certificate only), hide the rest of the page and pin it to one sheet.
+     The :has() guard means normal browser printing (Ctrl+P) stays untouched. */
+  body:has(.ksb-print-active) *:not(.ksb-print-active):not(.ksb-print-active *) {
     visibility: hidden;
   }
 
-  .ksb-print-active {
+  body:has(.ksb-print-active) .ksb-print-active {
     visibility: visible;
     position: fixed;
     left: 0;

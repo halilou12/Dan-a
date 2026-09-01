@@ -16,8 +16,6 @@ services:
         fromDatabase:
           name: barista-db
           property: connectionString
-      - key: ADMIN_USERS
-        sync: false
       - key: SMTP_HOST
         sync: false
       - key: SMTP_PORT

@@ -20,6 +20,7 @@ import {
   requestPasswordReset,
   completePasswordReset,
 } from '../../lib/auth';
+import { getBootstrapStatus } from '../../lib/api';
 
 type Mode = 'login' | 'forgot' | 'forgot-reset';
 
@@ -307,6 +308,21 @@ const AdminLogin = () => {
   );
   const [username, setUsername] = useState('admin');
   const [password, setPassword] = useState('');
+  const [canSetup, setCanSetup] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    getBootstrapStatus()
+      .then((res) => {
+        if (alive) setCanSetup(Boolean(res.canSetup));
+      })
+      .catch(() => {
+        /* ignore — setup link is optional */
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
   const [error, setError] = useState('');
 
   const modeTitle: Record<Mode, { title: string; sub: string }> = {
@@ -403,6 +419,14 @@ const AdminLogin = () => {
 
             {step === 'credentials' && (
               <div className="mt-5 border-t border-[var(--cream)] pt-5 space-y-2.5 text-sm">
+                {canSetup && (
+                  <Link
+                    to="/admin/setup"
+                    className="block w-full rounded-lg bg-[var(--coffee-dark)] px-6 py-3 text-center text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors"
+                  >
+                    Set up the first admin account
+                  </Link>
+                )}
                 <Link
                   to="#"
                   onClick={() => switchMode('forgot')}

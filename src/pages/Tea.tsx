@@ -20,12 +20,13 @@ const Tea = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {teas.map((tea) => (
-          <div key={tea.name} className="bg-white rounded-xl p-6 shadow-md border border-[var(--coffee-accent)]/20 card-hover">
-            <div className="w-12 h-12 bg-gradient-to-br from-emerald-400 to-green-600 rounded-lg flex items-center justify-center mb-4 text-white text-xl font-bold overflow-hidden">
-              <img src={tea.src} alt={tea.name} className="w-full h-full object-cover" />
+          <div key={tea.name} className="relative flex items-end bg-white rounded-xl overflow-hidden shadow-md border border-[var(--coffee-accent)]/20 card-hover min-h-[260px]">
+            <img src={tea.src} alt={tea.name} className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
+            <div className="relative p-6 pt-20 w-full text-white">
+              <h3 className="text-xl font-bold mb-2">{tea.name}</h3>
+              <p className="text-white/90">{tea.description}</p>
             </div>
-            <h3 className="text-xl font-bold text-[var(--text-dark)] mb-2">{tea.name}</h3>
-            <p className="text-[var(--text-medium)]">{tea.description}</p>
           </div>
         ))}
       </div>

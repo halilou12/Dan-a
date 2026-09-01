@@ -15,6 +15,7 @@ import Gallery from './pages/Gallery';
 import Contact from './pages/Contact';
 import VerifyCertificate from './pages/verify/VerifyCertificate';
 import AdminLogin from './pages/admin/AdminLogin';
+import SetupAdmin from './pages/admin/SetupAdmin';
 import ResetPassword from './pages/admin/ResetPassword';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminGallery from './pages/admin/AdminGallery';
@@ -46,6 +47,7 @@ function App() {
           <Route path="verify" element={<VerifyCertificate />} />
           <Route path="verify/:token" element={<VerifyCertificate />} />
           <Route path="admin/login" element={<AdminLogin />} />
+          <Route path="admin/setup" element={<SetupAdmin />} />
           <Route path="admin/reset" element={<ResetPassword />} />
           <Route path="admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
           <Route path="admin/gallery" element={<RequireAdmin><AdminGallery /></RequireAdmin>} />

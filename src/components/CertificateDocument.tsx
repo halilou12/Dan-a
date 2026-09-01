@@ -57,12 +57,12 @@ const CertificateDocument = ({
         </div>
       )}
 
-      {/* QR code — top-right corner */}
-      <div className="absolute flex flex-col items-center" style={{ right: '4%', top: '6%' }}>
-        <QrCode value={verificationURL(token)} size={110} />
+      {/* QR code — small, bottom-right free space */}
+      <div className="absolute flex flex-col items-center" style={{ right: '3%', bottom: '3%' }}>
+        <QrCode value={verificationURL(token)} size={70} />
         <p
           className="text-center text-white"
-          style={{ fontSize: '9px', textShadow: '1px 1px 1px rgba(0,0,0,0.7)' }}
+          style={{ fontSize: '7px', textShadow: '1px 1px 1px rgba(0,0,0,0.7)' }}
         >
           Scan to verify
         </p>
@@ -97,13 +97,9 @@ const CertificateDocument = ({
           </p>
         </div>
 
-        {/* Certificate ID — bottom-left */}
-        <div className="absolute left-[6%] text-white" style={{ bottom: '9%' }}>
+        {/* Certificate ID + issue date — bottom-left, away from the QR */}
+        <div className="absolute text-white flex items-baseline gap-3" style={{ left: '6%', bottom: '4%' }}>
           <p className="font-mono" style={{ fontSize: 'clamp(9px, 1.4vw, 14px)' }}>{certId}</p>
-        </div>
-
-        {/* Issue date — bottom-right */}
-        <div className="absolute right-[6%] text-white text-right" style={{ bottom: '9%' }}>
           <p style={{ fontSize: 'clamp(9px, 1.4vw, 14px)' }}>{issueDate}</p>
         </div>
     </div>
