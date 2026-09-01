@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'node:crypto';
 import speakeasy from 'speakeasy';
-import db from './db.js';
+import db, { schemaReady } from './db.js';
 import { sendEmail, appOrigin } from './email.js';
 
 const router = Router();
@@ -82,23 +82,25 @@ const requireAuth = (req, res, next) => {
   }
 };
 
-// Register a new admin account.
-router.post('/auth/register', async (_req, res) => {
-  res.status(403).json({
-    error: 'Administrator registration is closed. Access is granted only to authorized staff.',
-  });
-});
-
 // Seed the team of administrators (the only people allowed to log in and manage
 // the project). Reads ADMIN_USERS as a JSON array: [{username, email, password}].
-// Idempotent: existing accounts are left untouched, so 2FA stays intact.
+// Idempotent: existing matching accounts are left untouched, so 2FA stays
+// intact. On every start it logs each ADMIN_USERS account's TOTP secret so the
+// operator can add it to an authenticator app and complete step-2 sign-in.
 async function seedAdmins() {
   let raw = process.env.ADMIN_USERS;
   if (!raw) return;
   // Tolerate common paste/editor quirks: surrounding quotes, HTML entities,
   // surrounding whitespace, and line breaks inside the JSON.
-  raw = String(raw).trim().replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
-  while ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+  raw = String(raw)
+    .trim()
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, '&');
+  while (
+    (raw.startsWith('"') && raw.endsWith('"')) ||
+    (raw.startsWith("'") && raw.endsWith("'"))
+  ) {
     raw = raw.slice(1, -1).trim();
   }
   raw = raw.replace(/\r?\n[\s]*/g, '').replace(/}\s*,?\s*{/g, '},{');
@@ -107,7 +109,10 @@ async function seedAdmins() {
   try {
     users = JSON.parse(raw);
   } catch (err) {
-    console.warn('ADMIN_USERS is not valid JSON. Provide a JSON array like [{"username":...}].', err.message);
+    console.warn(
+      'ADMIN_USERS is not valid JSON. Provide an array like [{"username":...}].',
+      err.message,
+    );
     return;
   }
   if (!Array.isArray(users) || users.length === 0) return;
@@ -116,14 +121,24 @@ async function seedAdmins() {
     const username = String(u.username || '').trim();
     const email = String(u.email || '').trim().toLowerCase();
     const password = String(u.password || '');
-    if (!username || !email || password.length < 8) continue;
-
+    if (!username || !email || password.length < 8) {
+      console.warn(
+        '[seed] Skipping ADMIN_USERS entry (needs username, email, and a password of at least 8 characters):',
+        JSON.stringify(u),
+      );
+      continue;
+    }
     try {
-      const existing = await db.query('SELECT id FROM users WHERE username = $1 OR email = $2', [
-        username,
-        email,
-      ]);
-      if (existing.rows.length > 0) continue;
+      const existing = await db.query(
+        'SELECT * FROM users WHERE username = $1 OR email = $2',
+        [username, email],
+      );
+      if (existing.rows.length > 0) {
+        console.warn(
+          `[seed] Administrator "${username}" already exists. For sign-in step 2, add this TOTP secret to Google Authenticator: ${existing.rows[0].totp_secret}`,
+        );
+        continue;
+      }
       const passwordHash = bcrypt.hashSync(password, 12);
       const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
       await db.query(
@@ -131,15 +146,158 @@ async function seedAdmins() {
          VALUES ($1, $2, $3, $4, TRUE)`,
         [username, email, passwordHash, totpSecret],
       );
-      console.log(`Seeded administrator account: ${username}`);
+      console.warn(
+        `[seed] Created administrator "${username}". Add this TOTP secret to Google Authenticator, then sign in (step 2 will ask for a 6-digit code): ${totpSecret}`,
+      );
     } catch (err) {
-      console.warn(`Could not seed administrator ${username}:`, err.message || err);
+      console.warn(`[seed] Could not seed administrator "${username}":`, err.message || err);
     }
   }
 }
 
-seedAdmins().catch((err) => {
-  console.warn('Admin seeding failed:', err.message || err);
+schemaReady
+  .then(() => seedAdmins())
+  .catch((err) => {
+    console.warn('Admin seeding failed:', err.message || err);
+  });
+
+// Count admin accounts. Used to gate the one-time bootstrap.
+async function adminCount() {
+  const { rows } = await db.query('SELECT COUNT(*)::int AS n FROM users');
+  return Number(rows[0]?.n ?? 0);
+}
+
+// Public: is the site in "first admin" setup state? True only while zero admin
+// accounts exist. Once the first admin is created this permanently flips false.
+router.get('/bootstrap-status', async (_req, res) => {
+  try {
+    const n = await adminCount();
+    res.json({ canSetup: n === 0 });
+  } catch (err) {
+    console.error('bootstrap-status error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Public: create the very FIRST admin account. Only works while zero admin
+// accounts exist, so exactly the person who sets it up gets the initial account.
+router.post('/bootstrap', async (req, res) => {
+  try {
+    if ((await adminCount()) > 0) {
+      return res.status(409).json({ error: 'An administrator already exists.' });
+    }
+    const { username, email, password } = req.body || {};
+    const uname = String(username || '').trim();
+    const em = String(email || '').trim().toLowerCase();
+    if (uname.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (String(password || '').length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    const existing = await db.query(
+      'SELECT id FROM users WHERE username = $1 OR email = $2',
+      [uname, em],
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'That username or email is already in use.' });
+    }
+    const passwordHash = bcrypt.hashSync(String(password), 12);
+    const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
+    const info = await db.query(
+      `INSERT INTO users (username, email, password_hash, totp_secret, seeded)
+       VALUES ($1, $2, $3, $4, TRUE)
+       RETURNING *`,
+      [uname, em, passwordHash, totpSecret],
+    );
+    res.status(201).json({
+      user: {
+        id: String(info.rows[0].id),
+        username: info.rows[0].username,
+        email: info.rows[0].email,
+        role: info.rows[0].role,
+        seeded: true,
+        totpSecret,
+      },
+    });
+  } catch (err) {
+    console.error('bootstrap error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Auth required: list the admin team (used to manage the 4-person access list).
+router.get('/users', requireAuth, async (_req, res) => {
+  try {
+    const { rows } = await db.query(
+      'SELECT id, username, email, role, seeded, created_at FROM users ORDER BY created_at',
+    );
+    res.json({ users: rows.map(normalizeUser) });
+  } catch (err) {
+    console.error('list users error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Auth required: an existing admin adds a team member (creates their account).
+router.post('/users', requireAuth, async (req, res) => {
+  try {
+    const { username, email, password } = req.body || {};
+    const uname = String(username || '').trim();
+    const em = String(email || '').trim().toLowerCase();
+    if (uname.length < 3) {
+      return res.status(400).json({ error: 'Username must be at least 3 characters.' });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) {
+      return res.status(400).json({ error: 'Enter a valid email address.' });
+    }
+    if (String(password || '').length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+    }
+    const existing = await db.query(
+      'SELECT id FROM users WHERE username = $1 OR email = $2',
+      [uname, em],
+    );
+    if (existing.rows.length > 0) {
+      return res.status(409).json({ error: 'That username or email is already in use.' });
+    }
+    const passwordHash = bcrypt.hashSync(String(password), 12);
+    const totpSecret = speakeasy.generateSecret({ length: 20 }).base32;
+    const info = await db.query(
+      `INSERT INTO users (username, email, password_hash, totp_secret)
+       VALUES ($1, $2, $3, $4)
+       RETURNING *`,
+      [uname, em, passwordHash, totpSecret],
+    );
+    res.status(201).json({ user: normalizeUser(info.rows[0]) });
+  } catch (err) {
+    console.error('add user error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
+});
+
+// Auth required: remove a team member. You cannot remove yourself or the last admin.
+router.delete('/users/:id', requireAuth, async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    const { rows } = await db.query('SELECT id, username FROM users WHERE id = $1', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'User not found.' });
+    if (String(rows[0].id) === String(req.user.sub)) {
+      return res.status(400).json({ error: 'You cannot remove your own account.' });
+    }
+    const count = await adminCount();
+    if (count <= 1) {
+      return res.status(400).json({ error: 'You cannot remove the last administrator.' });
+    }
+    await db.query('DELETE FROM users WHERE id = $1', [id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('delete user error:', err);
+    res.status(500).json({ error: 'Something went wrong.' });
+  }
 });
 
 router.get('/auth/session', requireAuth, async (req, res) => {

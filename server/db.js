@@ -25,7 +25,10 @@ async function initSchema() {
   dbReady = true;
 }
 
-initSchema().catch((err) => {
+// Resolves (even when the schema init is skipped) once the first startup
+// attempt to create the schema has finished. Seeders await this before they
+// touch any tables, so INSERTs never race against CREATE TABLE.
+export const schemaReady = initSchema().catch((err) => {
   console.warn('Database unavailable (schema init skipped):', err.message || err);
 });
 
