@@ -9,7 +9,7 @@ import {
   BookOpen,
   Wrench,
 } from 'lucide-react';
-import { useStore, enrollmentsOf, programById } from '../../lib/store';
+import { useStore, enrollmentsOf, programById, enrollStudent, PROGRAMS } from '../../lib/store';
 import {
   getToken,
 } from '../../lib/auth';
@@ -58,6 +58,9 @@ const DailyMarks = () => {
   const enrolledProgramIds = studentEnrollments.map((e) => e.programId);
   const selectedProg = selectedProgram ? programById(selectedProgram) : undefined;
   const modules = selectedProg?.modules ?? [];
+  // Programs the student is not enrolled in yet — choosing one from the list
+  // will auto-enroll the student so their modules become available for marks.
+  const availablePrograms = PROGRAMS.filter((p) => !enrolledProgramIds.includes(p.id));
 
   // When student changes, auto-select first enrolled program
   useEffect(() => {
@@ -65,6 +68,15 @@ const DailyMarks = () => {
       setSelectedProgram(enrolledProgramIds[0]);
     }
   }, [selectedStudent]);
+
+  const handleProgramChange = (programId: string) => {
+    setSelectedProgram(programId);
+    setSelectedModule('');
+    if (programId && !enrolledProgramIds.includes(programId)) {
+      enrollStudent(selectedStudent, programId);
+      setNotice({ kind: 'success', text: `${student?.fullName ?? 'Student'} enrolled in ${programById(programId)?.title ?? 'program'}. You can now record daily marks.` });
+    }
+  };
 
   // Load sessions when student + program selected
   useEffect(() => {
@@ -168,7 +180,7 @@ const DailyMarks = () => {
             <label className={labelClass}>Student</label>
             <select
               value={selectedStudent}
-              onChange={(e) => { setSelectedStudent(e.target.value); setSelectedModule(''); }}
+              onChange={(e) => { setSelectedStudent(e.target.value); setSelectedProgram(''); setSelectedModule(''); }}
               className={`${inputClass} w-full`}
             >
               <option value="">— Choose student —</option>
@@ -181,16 +193,18 @@ const DailyMarks = () => {
             <label className={labelClass}>Program</label>
             <select
               value={selectedProgram}
-              onChange={(e) => { setSelectedProgram(e.target.value); setSelectedModule(''); }}
+              onChange={(e) => handleProgramChange(e.target.value)}
               className={`${inputClass} w-full`}
               disabled={!selectedStudent}
             >
               <option value="">— Choose program —</option>
-              {enrolledProgramIds.map((pid) => {
-                const prog = programById(pid);
-                return prog ? <option key={pid} value={pid}>{prog.title}</option> : null;
-              })}
+              {PROGRAMS.map((prog) => <option key={prog.id} value={prog.id}>{prog.title}</option>)}
             </select>
+            {selectedStudent && availablePrograms.length > 0 && (
+              <p className="mt-1 text-xs text-[var(--coffee-light)]">
+                Not enrolled yet — choosing a program below will enroll {student?.fullName?.split(' ')[0]} in it so their modules appear.
+              </p>
+            )}
           </div>
         </div>
       </div>
