@@ -221,6 +221,28 @@ export const pushDataSnapshot = (
 export const deleteStudentOnServer = (token: string, id: string) =>
   request<{ ok: boolean }>(`/students/${id}`, { method: 'DELETE', token });
 
+// Register a single student reliably on the shared server (no full-snapshot
+// truncate). Returns the saved student id.
+export const registerStudentOnServer = (
+  token: string,
+  student: {
+    id: string;
+    fullName: string;
+    nationalId?: string;
+    dob?: string;
+    email?: string;
+    phone?: string;
+    photo?: string | null;
+    status?: string;
+    createdAt?: string;
+  },
+) =>
+  request<{ ok: boolean; id: string }>('/students', {
+    method: 'POST',
+    body: student,
+    token,
+  });
+
 const GALLERY_BASE = '/api/gallery';
 
 export const uploadGalleryImage = async (

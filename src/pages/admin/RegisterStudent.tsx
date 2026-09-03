@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, UserPlus, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, UserPlus, Image as ImageIcon, Loader2 } from 'lucide-react';
 import { registerStudent, reloadFromServer } from '../../lib/store';
+import { registerStudentOnServer } from '../../lib/api';
+import { getToken } from '../../lib/auth';
 
 const inputClass =
   'mt-1 w-full rounded-lg border border-[var(--coffee-accent)]/40 bg-white px-4 py-2.5 text-[var(--text-dark)] focus:outline-none focus:ring-2 focus:ring-[var(--coffee-accent)]';
@@ -19,6 +21,7 @@ const RegisterStudent = () => {
   });
   const [photo, setPhoto] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     reloadFromServer();
@@ -36,14 +39,45 @@ const RegisterStudent = () => {
     reader.readAsDataURL(file);
   };
 
-  const submit = (e: React.FormEvent) => {
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fullName.trim() || !form.nationalId.trim() || !form.dob || !form.email.trim() || !form.phone.trim()) {
       setError('All fields are required.');
       return;
     }
-    const student = registerStudent({ ...form, photo });
-    navigate(`/admin/students/${student.id}`);
+    setError('');
+    setSaving(true);
+    try {
+      const student = registerStudent({ ...form, photo });
+      // Persist the new student on the shared server so all team members can
+      // see it. If the server save fails, surface the error instead of
+      // silently losing the record on reload.
+      const token = getToken();
+      if (token) {
+        try {
+          await registerStudentOnServer(token, {
+            id: student.id,
+            fullName: student.fullName,
+            nationalId: student.nationalId,
+            dob: student.dob,
+            email: student.email,
+            phone: student.phone,
+            photo: student.photo,
+            status: student.status,
+            createdAt: student.createdAt,
+          });
+        } catch (serverErr) {
+          setError(`Registered locally, but could not save to the shared server: ${serverErr instanceof Error ? serverErr.message : 'error'}. The record will persist once the push retries.`);
+          navigate(`/admin/students/${student.id}`);
+          return;
+        }
+      }
+      navigate(`/admin/students/${student.id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to register student.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -109,9 +143,11 @@ const RegisterStudent = () => {
           <div className="sm:col-span-2 flex gap-3 pt-2">
             <button
               type="submit"
-              className="rounded-lg bg-[var(--coffee-dark)] px-6 py-3 text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors"
+              disabled={saving}
+              className="inline-flex items-center gap-2 rounded-lg bg-[var(--coffee-dark)] px-6 py-3 text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Register Student
+              {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+              {saving ? 'Saving...' : 'Register Student'}
             </button>
             <Link
               to="/admin"

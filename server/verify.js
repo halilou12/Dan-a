@@ -445,4 +445,49 @@ router.delete('/admin/students/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Register a single student without truncating the whole shared dataset.
+// This makes registration reliable for a multi-admin team: it writes (or
+// upserts) just this one record instead of relying on a full snapshot push.
+router.post('/admin/students', requireAuth, async (req, res) => {
+  const { id, fullName, nationalId, dob, email, phone, photo, status, createdAt } = req.body || {};
+  if (!id || !fullName) {
+    return res.status(400).json({ error: 'Student id and full name are required.' });
+  }
+  try {
+    await db.query(
+      `INSERT INTO students (id, full_name, national_id, dob, email, phone, photo, status, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+       ON CONFLICT (id) DO UPDATE
+         SET full_name = EXCLUDED.full_name, national_id = EXCLUDED.national_id,
+             dob = EXCLUDED.dob, email = EXCLUDED.email, phone = EXCLUDED.phone,
+             photo = EXCLUDED.photo, status = EXCLUDED.status, created_at = EXCLUDED.created_at`,
+      [
+        String(id),
+        String(fullName),
+        nationalId ?? null,
+        dob ?? null,
+        email ?? null,
+        phone ?? null,
+        photo ?? null,
+        (status || 'active'),
+        createdAt ?? new Date().toISOString().slice(0, 10),
+      ],
+    );
+    await db.query(
+      `INSERT INTO activity_logs (user_id, username, action, entity_type, entity_id, detail)
+       VALUES ($1, $2, 'register_student', 'student', $3, $4::jsonb)`,
+      [
+        req.user.sub ?? null,
+        req.user.username ?? null,
+        String(id),
+        JSON.stringify({ fullName }),
+      ],
+    );
+    res.status(201).json({ ok: true, id: String(id) });
+  } catch (err) {
+    console.error('register student error:', err);
+    res.status(500).json({ error: 'Failed to register student.' });
+  }
+});
+
 export { router as verifyRouter };
