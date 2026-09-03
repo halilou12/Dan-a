@@ -537,26 +537,49 @@ export const reloadFromServer = async (): Promise<void> => {
   try {
     const snap = await fetchDataSnapshot(token);
     if (snap.serverHasData) {
+      const local = getData();
+      // Merge: keep any local records that were just created/edited but have
+      // not been pushed to the shared server yet, so a fresh client (detail
+      // page, etc.) never wipes a record that a teammate registered seconds
+      // ago before the background push finished.
+      const keepPending = <T>(server: T[], localArr: T[], key: (x: T) => string): T[] => {
+        const pending = localArr.filter((x) => !server.some((s) => key(s) === key(x)));
+        return [...server, ...pending];
+      };
+
+      const mergedStudents = keepPending(
+        snap.students.map((s) => ({ ...s, status: (s.status as StudentStatus) || 'active' as StudentStatus })),
+        local.students,
+        (s) => s.id,
+      );
+      const mergedEnrollments = keepPending(
+        snap.enrollments,
+        local.enrollments,
+        (e) => `${e.studentId}:${e.programId}`,
+      );
+      const mergedAssessments = keepPending(
+        snap.assessments.map((a) => ({ ...a, grade: (a.grade as Grade) || 'Competent' as Grade })),
+        local.assessments,
+        (a) => `${a.studentId}:${a.programId}:${a.module}`,
+      );
+      const mergedCertificates = keepPending(
+        snap.certificates.map((c) => ({ ...c, status: (c.status as CertificateStatus) || 'valid' as CertificateStatus })),
+        local.certificates,
+        (c) => c.id,
+      );
+
       const merged: StoreData = {
-        students: snap.students.map((s) => ({
-          ...s,
-          status: (s.status as StudentStatus) || 'active',
-        })),
-        enrollments: snap.enrollments,
-        assessments: snap.assessments.map((a) => ({
-          ...a,
-          grade: (a.grade as Grade) || 'Competent',
-        })),
-        certificates: snap.certificates.map((c) => ({
-          ...c,
-          status: (c.status as CertificateStatus) || 'valid',
-        })),
-        gallery: snap.gallery.length > 0 ? snap.gallery : getData().gallery,
+        students: mergedStudents,
+        enrollments: mergedEnrollments,
+        assessments: mergedAssessments,
+        certificates: mergedCertificates,
+        gallery: snap.gallery.length > 0 ? snap.gallery : local.gallery,
         counters: recomputeCounters({
-          students: snap.students,
-          certificates: snap.certificates,
+          students: mergedStudents,
+          certificates: mergedCertificates,
         }),
       };
+
       data = merged;
       persist(merged);
       listeners.forEach((l) => l());

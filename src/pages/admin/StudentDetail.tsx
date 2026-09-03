@@ -393,7 +393,7 @@ const StudentDetail = () => {
   const { studentId } = useParams();
   const navigate = useNavigate();
   const data = useStore();
-  const student = data.students.find((s) => s.id === studentId);
+  const student = data.students.find((s) => s.id.toLowerCase() === String(studentId).toLowerCase());
 
   const enrollments = student ? enrollmentsOf(student.id) : [];
   const enrolledIds = enrollments.map((e) => e.programId);
