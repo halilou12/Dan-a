@@ -55,11 +55,11 @@ const Home = () => {
       <section className="py-16 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-[var(--text-dark)] mb-4">
-            About Us
+            About Kigali Specialist Barista (KBS)
           </h2>
           <p className="text-[var(--text-medium)] max-w-2xl mx-auto text-lg">
-            The Kigali Specialist Barista is Rwanda's premier coffee training academy and beverage destination.
-            We offer professional barista training and serve the finest coffees, juices, smoothies,
+            Kigali Specialist Barista (KBS) is Rwanda's premier coffee training academy and professional beverage destination located in Kigali, Rwanda.
+            We offer certified barista training, coffee education programs, and professional coffee services — serving the finest specialty coffees, fresh juices, smoothies,
             and handcrafted beverages in Kigali.
           </p>
         </div>
@@ -72,7 +72,7 @@ const Home = () => {
               Our Services
             </h2>
             <p className="text-[var(--text-medium)] max-w-2xl mx-auto">
-              From professional coffee training to handcrafted beverages, we offer a complete experience for coffee lovers and aspiring baristas.
+              From professional barista training and coffee education to handcrafted beverages, KBS offers a complete experience for coffee lovers and aspiring baristas in Kigali.
             </p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -89,8 +89,8 @@ const Home = () => {
             Ready to Become a Certified Barista?
           </h2>
           <p className="text-gray-200 mb-8 max-w-2xl mx-auto">
-            Join our professional training programs and master the art of coffee making.
-            From beginner to advanced, we have courses for every level.
+            Join KBS professional barista training programs in Kigali and master the art of coffee making. From beginner to advanced,
+            we have certified courses for every level of coffee education.
           </p>
           <a
             href="/coffee-training"

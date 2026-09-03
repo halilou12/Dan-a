@@ -18,11 +18,11 @@ const Hero = () => {
       <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-24 md:py-32">
         <div className="text-center max-w-3xl mx-auto">
           <h1 className="text-4xl md:text-6xl font-extrabold mb-6 animate-fade-in">
-            THE KIGALI
-            <span className="block text-[var(--coffee-accent)]">SPECIALIST BARISTA</span>
+            KIGALI SPECIALIST
+            <span className="block text-[var(--coffee-accent)]">BARISTA (KBS)</span>
           </h1>
           <p className="text-xl md:text-2xl text-gray-200 mb-8 animate-slide-up">
-            Professional Coffee Training & Premium Beverages in Kigali, Rwanda
+            Professional Barista Training, Coffee Education & Premium Coffee Services in Kigali, Rwanda
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center animate-slide-up">
             <Link
