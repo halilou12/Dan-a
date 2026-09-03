@@ -90,6 +90,23 @@ CREATE TABLE IF NOT EXISTS assessments (
     UNIQUE (student_id, program_id, module)
 );
 
+-- Daily training sessions: a log of theory / practical work done each day,
+-- with a per-module score recorded by the assessor who supervised the class.
+CREATE TABLE IF NOT EXISTS training_sessions (
+    id            BIGSERIAL PRIMARY KEY,
+    student_id    TEXT NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+    program_id    TEXT NOT NULL REFERENCES programs(id) ON DELETE CASCADE,
+    module        TEXT NOT NULL,
+    session_date  TEXT NOT NULL,
+    work_type     TEXT NOT NULL DEFAULT 'theory',  -- 'theory' | 'practical' | 'both'
+    score         INTEGER NOT NULL DEFAULT 0,
+    notes         TEXT,
+    assessor      TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_training_session_student ON training_sessions(student_id);
+
 CREATE TABLE IF NOT EXISTS certificates (
     id             TEXT PRIMARY KEY,
     token          TEXT NOT NULL UNIQUE,

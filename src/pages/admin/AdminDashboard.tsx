@@ -13,6 +13,7 @@ import {
   Image,
   Trash2,
   History,
+  ClipboardList,
 } from 'lucide-react';
 import QrCode from '../../components/QrCode';
 import {
@@ -247,6 +248,12 @@ const AdminDashboard = () => {
             className="inline-flex items-center justify-center gap-2 rounded-lg bg-[var(--coffee-dark)] px-5 py-3 text-white font-semibold hover:bg-[var(--coffee-medium)] transition-colors"
           >
             <UserPlus className="h-4 w-4" /> Register New Student
+          </Link>
+          <Link
+            to="/admin/daily-marks"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--coffee-accent)] px-5 py-3 text-[var(--coffee-dark)] font-semibold hover:bg-[var(--cream)] transition-colors"
+          >
+            <ClipboardList className="h-4 w-4" /> Daily Marks
           </Link>
           <Link
             to="/admin/gallery"

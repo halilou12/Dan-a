@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { requireAuth } from './auth.js';
+import db from './db.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads', 'gallery');
@@ -52,7 +53,7 @@ router.post('/upload-error', (_req, res) => {
 });
 
 // Delete a gallery image (admin only).
-router.delete('/:filename', requireAuth, (req, res) => {
+router.delete('/:filename', requireAuth, async (req, res) => {
   const filename = path.basename(req.params.filename);
   if (filename !== req.params.filename || filename.startsWith('.')) {
     return res.status(400).json({ error: 'Invalid filename.' });
@@ -60,6 +61,25 @@ router.delete('/:filename', requireAuth, (req, res) => {
   const filePath = path.join(UPLOAD_DIR, filename);
   if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found.' });
   fs.unlinkSync(filePath);
+
+  // Also remove the entry from app_meta so deleted images don't reappear
+  try {
+    const { rows } = await db.query('SELECT value FROM app_meta WHERE key = $1', ['gallery']);
+    if (rows.length > 0) {
+      const gallery = Array.isArray(rows[0].value) ? rows[0].value : [];
+      const updated = gallery.filter((g) => {
+        const src = g.src || '';
+        return !src.endsWith(filename) && !src.includes(`/gallery/${filename}`);
+      });
+      await db.query(
+        'INSERT INTO app_meta (key, value) VALUES ($1, $2::jsonb) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value',
+        ['gallery', JSON.stringify(updated)],
+      );
+    }
+  } catch (err) {
+    console.error('Failed to update gallery metadata:', err);
+  }
+
   res.json({ ok: true });
 });
 

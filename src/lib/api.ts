@@ -359,3 +359,91 @@ export const syncCertificate = async (
     throw err;
   }
 };
+
+const SESSIONS_BASE = '/api/sessions';
+
+export interface TrainingSession {
+  id: number;
+  student_id: string;
+  program_id: string;
+  module: string;
+  session_date: string;
+  work_type: 'theory' | 'practical' | 'both';
+  score: number;
+  notes?: string | null;
+  assessor?: string | null;
+  created_at?: string;
+}
+
+export const fetchSessions = async (
+  token: string,
+  opts?: { studentId?: string; programId?: string },
+): Promise<TrainingSession[]> => {
+  let url = SESSIONS_BASE;
+  if (opts?.studentId) url = `${SESSIONS_BASE}/student/${encodeURIComponent(opts.studentId)}`;
+  if (opts?.programId) url += `?programId=${encodeURIComponent(opts.programId)}`;
+  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  let data: { sessions?: TrainingSession[]; error?: string } | null = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const err = new Error(data?.error || 'Failed to load training sessions.') as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+  return data?.sessions ?? [];
+};
+
+export const createSession = async (
+  token: string,
+  payload: {
+    studentId: string;
+    programId: string;
+    module: string;
+    sessionDate: string;
+    workType: 'theory' | 'practical' | 'both';
+    score: number;
+    notes?: string;
+    assessor?: string;
+  },
+): Promise<TrainingSession> => {
+  const res = await fetch(SESSIONS_BASE, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(payload),
+  });
+  let data: { session?: TrainingSession; error?: string } | null = null;
+  try {
+    data = await res.json();
+  } catch {
+    data = null;
+  }
+  if (!res.ok) {
+    const err = new Error(data?.error || 'Failed to record training session.') as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+  return data!.session!;
+};
+
+export const deleteSession = async (token: string, id: number): Promise<void> => {
+  const res = await fetch(`${SESSIONS_BASE}/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) {
+    let msg = 'Failed to delete training session.';
+    try {
+      const data = await res.json();
+      if (data?.error) msg = data.error;
+    } catch {
+      // ignore
+    }
+    const err = new Error(msg) as ApiError;
+    err.status = res.status;
+    throw err;
+  }
+};

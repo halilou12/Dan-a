@@ -7,6 +7,7 @@ import { requireDb } from './db.js';
 import { authRouter } from './auth.js';
 import { galleryRouter } from './gallery.js';
 import { verifyRouter } from './verify.js';
+import { sessionsRouter } from './sessions.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -37,6 +38,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use('/api/admin', requireDb, authRouter);
 app.use('/api/gallery', requireDb, galleryRouter);
+app.use('/api', requireDb, sessionsRouter);
 app.use('/api', verifyRouter);
 
 app.get('/api/health', (_req, res) => {

@@ -21,6 +21,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminGallery from './pages/admin/AdminGallery';
 import RegisterStudent from './pages/admin/RegisterStudent';
 import StudentDetail from './pages/admin/StudentDetail';
+import DailyMarks from './pages/admin/DailyMarks';
 
 const RequireAdmin = ({ children }: { children: ReactNode }) => {
   const authed = useAuth();
@@ -52,6 +53,7 @@ function App() {
           <Route path="admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
           <Route path="admin/gallery" element={<RequireAdmin><AdminGallery /></RequireAdmin>} />
           <Route path="admin/register" element={<RequireAdmin><RegisterStudent /></RequireAdmin>} />
+          <Route path="admin/daily-marks" element={<RequireAdmin><DailyMarks /></RequireAdmin>} />
           <Route path="admin/students/:studentId" element={<RequireAdmin><StudentDetail /></RequireAdmin>} />
         </Route>
       </Routes>
