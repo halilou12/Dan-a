@@ -1,27 +1,47 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import type { ReactNode } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import { useAuth } from './lib/auth';
 import Home from './pages/Home';
-import Services from './pages/Services';
-import CoffeeTraining from './pages/CoffeeTraining';
-import Beverages from './pages/Beverages';
-import Juices from './pages/Juices';
-import Smoothies from './pages/Smoothies';
-import Milkshakes from './pages/Milkshakes';
-import Mojitos from './pages/Mojitos';
-import Tea from './pages/Tea';
-import Gallery from './pages/Gallery';
-import Contact from './pages/Contact';
-import VerifyCertificate from './pages/verify/VerifyCertificate';
-import AdminLogin from './pages/admin/AdminLogin';
-import SetupAdmin from './pages/admin/SetupAdmin';
-import ResetPassword from './pages/admin/ResetPassword';
-import AdminDashboard from './pages/admin/AdminDashboard';
-import AdminGallery from './pages/admin/AdminGallery';
-import RegisterStudent from './pages/admin/RegisterStudent';
-import StudentDetail from './pages/admin/StudentDetail';
-import DailyMarks from './pages/admin/DailyMarks';
+
+// Most routes are code-split so first-time visitors don't download admin,
+// certificate/QR, and beverage code they never see.
+const Services = lazy(() => import('./pages/Services'));
+const CoffeeTraining = lazy(() => import('./pages/CoffeeTraining'));
+const Beverages = lazy(() => import('./pages/Beverages'));
+const Juices = lazy(() => import('./pages/Juices'));
+const Smoothies = lazy(() => import('./pages/Smoothies'));
+const Milkshakes = lazy(() => import('./pages/Milkshakes'));
+const Mojitos = lazy(() => import('./pages/Mojitos'));
+const Tea = lazy(() => import('./pages/Tea'));
+const Gallery = lazy(() => import('./pages/Gallery'));
+const Contact = lazy(() => import('./pages/Contact'));
+const VerifyCertificate = lazy(() => import('./pages/verify/VerifyCertificate'));
+const AdminLogin = lazy(() => import('./pages/admin/AdminLogin'));
+const SetupAdmin = lazy(() => import('./pages/admin/SetupAdmin'));
+const ResetPassword = lazy(() => import('./pages/admin/ResetPassword'));
+const AdminDashboard = lazy(() => import('./pages/admin/AdminDashboard'));
+const AdminGallery = lazy(() => import('./pages/admin/AdminGallery'));
+const RegisterStudent = lazy(() => import('./pages/admin/RegisterStudent'));
+const StudentDetail = lazy(() => import('./pages/admin/StudentDetail'));
+const DailyMarks = lazy(() => import('./pages/admin/DailyMarks'));
+
+import type { ReactElement } from 'react';
+
+const lazyPage = (Comp: React.LazyExoticComponent<() => ReactElement>) => {
+  return () => (
+    <Suspense
+      fallback={
+        <div className="min-h-[50vh] flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--coffee-accent)]" />
+        </div>
+      }
+    >
+      <Comp />
+    </Suspense>
+  );
+};
 
 const RequireAdmin = ({ children }: { children: ReactNode }) => {
   const authed = useAuth();
@@ -35,26 +55,26 @@ function App() {
       <Routes>
         <Route path="/" element={<Layout />}>
           <Route index element={<Home />} />
-          <Route path="services" element={<Services />} />
-          <Route path="coffee-training" element={<CoffeeTraining />} />
-          <Route path="beverages" element={<Beverages />} />
-          <Route path="beverages/juices" element={<Juices />} />
-          <Route path="beverages/smoothies" element={<Smoothies />} />
-          <Route path="beverages/milkshakes" element={<Milkshakes />} />
-          <Route path="beverages/mojitos" element={<Mojitos />} />
-          <Route path="beverages/tea" element={<Tea />} />
-          <Route path="gallery" element={<Gallery />} />
-          <Route path="contact" element={<Contact />} />
-          <Route path="verify" element={<VerifyCertificate />} />
-          <Route path="verify/:token" element={<VerifyCertificate />} />
-          <Route path="admin/login" element={<AdminLogin />} />
-          <Route path="admin/setup" element={<SetupAdmin />} />
-          <Route path="admin/reset" element={<ResetPassword />} />
-          <Route path="admin" element={<RequireAdmin><AdminDashboard /></RequireAdmin>} />
-          <Route path="admin/gallery" element={<RequireAdmin><AdminGallery /></RequireAdmin>} />
-          <Route path="admin/register" element={<RequireAdmin><RegisterStudent /></RequireAdmin>} />
-          <Route path="admin/daily-marks" element={<RequireAdmin><DailyMarks /></RequireAdmin>} />
-          <Route path="admin/students/:studentId" element={<RequireAdmin><StudentDetail /></RequireAdmin>} />
+          <Route path="services" element={lazyPage(Services)()} />
+          <Route path="coffee-training" element={lazyPage(CoffeeTraining)()} />
+          <Route path="beverages" element={lazyPage(Beverages)()} />
+          <Route path="beverages/juices" element={lazyPage(Juices)()} />
+          <Route path="beverages/smoothies" element={lazyPage(Smoothies)()} />
+          <Route path="beverages/milkshakes" element={lazyPage(Milkshakes)()} />
+          <Route path="beverages/mojitos" element={lazyPage(Mojitos)()} />
+          <Route path="beverages/tea" element={lazyPage(Tea)()} />
+          <Route path="gallery" element={lazyPage(Gallery)()} />
+          <Route path="contact" element={lazyPage(Contact)()} />
+          <Route path="verify" element={lazyPage(VerifyCertificate)()} />
+          <Route path="verify/:token" element={lazyPage(VerifyCertificate)()} />
+          <Route path="admin/login" element={lazyPage(AdminLogin)()} />
+          <Route path="admin/setup" element={lazyPage(SetupAdmin)()} />
+          <Route path="admin/reset" element={lazyPage(ResetPassword)()} />
+          <Route path="admin" element={<RequireAdmin>{lazyPage(AdminDashboard)()}</RequireAdmin>} />
+          <Route path="admin/gallery" element={<RequireAdmin>{lazyPage(AdminGallery)()}</RequireAdmin>} />
+          <Route path="admin/register" element={<RequireAdmin>{lazyPage(RegisterStudent)()}</RequireAdmin>} />
+          <Route path="admin/daily-marks" element={<RequireAdmin>{lazyPage(DailyMarks)()}</RequireAdmin>} />
+          <Route path="admin/students/:studentId" element={<RequireAdmin>{lazyPage(StudentDetail)()}</RequireAdmin>} />
         </Route>
       </Routes>
     </Router>

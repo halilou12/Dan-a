@@ -1,4 +1,5 @@
 import express from 'express';
+import compression from 'compression';
 import multer from 'multer';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -32,9 +33,13 @@ console.log(
   )}`,
 );
 
+app.use(compression());
 app.use(express.json({ limit: '5mb' }));
 
-app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
+app.use(
+  '/uploads',
+  express.static(path.join(__dirname, '..', 'uploads'), { maxAge: '7d' }),
+);
 
 app.use('/api/admin', requireDb, authRouter);
 app.use('/api/gallery', requireDb, galleryRouter);
@@ -61,9 +66,21 @@ const distDir = path.join(__dirname, '..', 'dist');
 const indexHtml = path.join(distDir, 'index.html');
 
 if (fs.existsSync(distDir)) {
+  // Hashed build assets are immutable — cache aggressively.
+  app.use(
+    '/assets',
+    express.static(path.join(distDir, 'assets'), { immutable: true, maxAge: '1y' }),
+  );
   // Serve assets (JS/CSS/images) and index.html for any non-API route so
   // client-side routing (e.g. /admin/login, /verify/:token) always works.
-  app.use(express.static(distDir));
+  app.use(
+    express.static(distDir, {
+      maxAge: '7d',
+      setHeaders(res, filePath) {
+        if (filePath.endsWith('.html')) res.setHeader('Cache-Control', 'no-cache');
+      },
+    }),
+  );
   app.get(/.*/, (req, res, next) => {
     if (req.path.startsWith('/api')) return next();
     if (!fs.existsSync(indexHtml)) {

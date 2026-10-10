@@ -17,7 +17,7 @@ const ServiceCard = ({ title, description, icon: Icon, image, link }: ServiceCar
     >
       {image ? (
         <>
-          <img src={image} alt={title} className="absolute inset-0 w-full h-full object-cover" />
+          <img src={image} alt={title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
           <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
         </>
       ) : (

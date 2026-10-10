@@ -100,14 +100,14 @@ const CoffeeTraining = () => {
                   loop
                   muted
                   playsInline
-                  preload="metadata"
+                  preload="none"
                   poster={course.image}
                 >
                   <source src={course.video} type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
               ) : (
-                <img src={course.image} alt={course.title} className="absolute inset-0 w-full h-full object-cover" />
+                <img src={course.image} alt={course.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
               <div className="relative p-6 pt-20 w-full text-white">
@@ -160,7 +160,7 @@ const CoffeeTraining = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {specialtyMethods.map((method) => (
             <div key={method.name} className="relative flex items-end bg-gradient-to-br from-[var(--coffee-dark)] to-[var(--coffee-medium)] rounded-xl overflow-hidden card-hover min-h-[260px] text-white">
-              <img src={method.image} alt={method.name} className="absolute inset-0 w-full h-full object-cover" />
+              <img src={method.image} alt={method.name} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
               <div className="absolute inset-0 bg-gradient-to-t from-[var(--coffee-dark)]/90 via-[var(--coffee-dark)]/30 to-transparent" />
               <div className="relative p-6 pt-20 w-full">
                 <h3 className="text-xl font-bold mb-3">{method.name}</h3>

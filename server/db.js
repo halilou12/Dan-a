@@ -15,6 +15,11 @@ const connectionString =
 export const pool = new Pool({
   connectionString,
   ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  // Fail fast instead of hanging requests when the database is unreachable.
+  connectionTimeoutMillis: 5000,
+  idleTimeoutMillis: 30000,
+  statement_timeout: 10000,
+  query_timeout: 10000,
 });
 
 let dbReady = false;
