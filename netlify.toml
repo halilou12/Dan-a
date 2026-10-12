@@ -1,0 +1,34 @@
+# Netlify config: builds the Vite frontend and proxies the API + uploads to
+# the Express backend hosted on Railway.
+#
+# Set an environment variable named API_URL in the Netlify UI (Site settings ->
+# Environment variables) to your Railway service URL, e.g.
+#   API_URL = https://barista-api.up.railway.app
+# The build command substitutes it into the redirects below.
+[build]
+  command = "sed -i \"s|__API_URL__|${API_URL}|g\" netlify.toml && npm ci && npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Proxy API calls to Railway (same-origin from the browser's point of view, so
+# no CORS setup is needed).
+[[redirects]]
+  from = "/api/*"
+  to = "__API_URL__/api/:splat"
+  status = 200
+  force = true
+
+# Serve admin-uploaded images from the Railway backend.
+[[redirects]]
+  from = "/uploads/*"
+  to = "__API_URL__/uploads/:splat"
+  status = 200
+  force = true
+
+# SPA fallback: let the React router handle client-side routes.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
