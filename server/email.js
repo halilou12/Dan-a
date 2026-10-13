@@ -45,14 +45,15 @@ export async function sendEmail({ to, subject, text, html }) {
   }
 }
 
-// The public origin used to build clickable reset links. In production Render
-// injects RENDER_EXTERNAL_URL; fall back to the SMTP_APP_URL override or a sane
-// default so the email link always points somewhere reachable.
+// The public origin used to build clickable reset links. Prefer APP_URL (the
+// public frontend, e.g. the Netlify site); fall back to the SMTP_APP_URL
+// override, a host-provided URL, or a sane default so the email link always
+// points somewhere reachable.
 export function appOrigin() {
   return (
-    process.env.RENDER_EXTERNAL_URL ||
-    process.env.SMTP_APP_URL ||
     process.env.APP_URL ||
+    process.env.SMTP_APP_URL ||
+    process.env.RENDER_EXTERNAL_URL ||
     'http://localhost:5173'
   );
 }

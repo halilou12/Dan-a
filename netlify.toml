@@ -1,29 +1,38 @@
-# Netlify config: builds the Vite frontend and proxies the API + uploads to
-# the Express backend hosted on Railway.
+# Netlify config: builds the Vite frontend, deploys the Express API as a
+# serverless function, and stores uploaded gallery images in Netlify Blobs.
 #
-# Set an environment variable named API_URL in the Netlify UI (Site settings ->
-# Environment variables) to your Railway service URL, e.g.
-#   API_URL = https://barista-api.up.railway.app
-# The build command substitutes it into the redirects below.
+# Environment variables to set in the Netlify UI (Site settings -> Environment
+# variables):
+#   DATABASE_URL  = postgres connection string (e.g. Neon, with ?sslmode=require)
+#   JWT_SECRET    = long random string (keep sessions valid across cold starts)
+#   ADMIN_USERS   = JSON array of admin accounts (optional seed)
+#   APP_URL       = https://kigali-barista.app (for password-reset links)
+#   SMTP_*        = optional SMTP settings for password-reset emails
 [build]
-  command = "sed -i \"s|__API_URL__|${API_URL}|g\" netlify.toml && npm ci && npm run build"
+  command = "npm ci && npm run build"
   publish = "dist"
 
 [build.environment]
   NODE_VERSION = "20"
 
-# Proxy API calls to Railway (same-origin from the browser's point of view, so
-# no CORS setup is needed).
+# Bundle the Express API as a Netlify Function.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+  external_node_modules = ["express", "pg"]
+
+# Route API calls to the serverless function (same-origin from the browser's
+# point of view, so no CORS setup is needed).
 [[redirects]]
   from = "/api/*"
-  to = "__API_URL__/api/:splat"
+  to = "/.netlify/functions/api/:splat"
   status = 200
   force = true
 
-# Serve admin-uploaded images from the Railway backend.
+# Serve admin-uploaded images through the function (Netlify Blobs).
 [[redirects]]
   from = "/uploads/*"
-  to = "__API_URL__/uploads/:splat"
+  to = "/.netlify/functions/api/uploads/:splat"
   status = 200
   force = true
 

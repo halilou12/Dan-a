@@ -1,5 +1,5 @@
 // Reset administrator accounts so the one-time /admin/setup flow re-enables.
-// Run from Render Shell: node scripts/reset-admins.cjs
+// Run with DATABASE_URL set: node scripts/reset-admins.cjs
 // This TRUNCATES the users table and anything that cascades from it (like
 // password-reset tokens). Programs, students and certificates are untouched.
 const { Client } = require('pg');

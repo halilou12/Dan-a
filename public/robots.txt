@@ -10,4 +10,4 @@ Allow: /
 User-agent: Bingbot
 Allow: /
 
-Sitemap: https://barista-api-xufj.onrender.com/sitemap.xml
+Sitemap: https://kigali-barista.app/sitemap.xml

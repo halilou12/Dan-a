@@ -18,7 +18,7 @@ jobs:
         run: |
           START=$(date +%s)
           HTTP_CODE=$(curl -sS -o /tmp/health-body -w '%{http_code}' --max-time 60 \
-            https://barista-api-xufj.onrender.com/api/health || echo 000)
+            https://kigali-barista.app/api/health || echo 000)
           END=$(date +%s)
           echo "code=$HTTP_CODE" >> "$GITHUB_OUTPUT"
           echo "elapsed=$((END - START))s" >> "$GITHUB_OUTPUT"
@@ -53,7 +53,7 @@ jobs:
                 `- **Elapsed:** ${context.payload.steps.ping.outputs.elapsed || 'n/a'}`,
                 `- **Run:** ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
                 '',
-                'Check the Render dashboard (service logs / deploy status) first.',
+                'Check the Netlify dashboard (deploy logs / status) first.',
                 'Close this issue once the site is back.',
               ].join('\n'),
             });

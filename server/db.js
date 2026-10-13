@@ -12,11 +12,20 @@ const connectionString =
   process.env.DATABASE_URL ||
   'postgres://postgres:postgres@localhost:5432/postgres';
 
+// Managed Postgres (Neon, etc.) requires SSL. Enable it for production or
+// whenever the connection string explicitly asks for it.
+const useSSL =
+  /sslmode=require/.test(connectionString) || process.env.NODE_ENV === 'production';
+
 export const pool = new Pool({
   connectionString,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : undefined,
+  ssl: useSSL ? { rejectUnauthorized: false } : undefined,
+  // Serverless functions are short-lived: keep the pool tiny and let idle
+  // connections close so Lambda freezes cleanly.
+  max: Number(process.env.PGPOOL_MAX || 3),
+  allowExitOnIdle: true,
   // Fail fast instead of hanging requests when the database is unreachable.
-  connectionTimeoutMillis: 5000,
+  connectionTimeoutMillis: 10000,
   idleTimeoutMillis: 30000,
   statement_timeout: 10000,
   query_timeout: 10000,

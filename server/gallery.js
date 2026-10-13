@@ -1,55 +1,66 @@
 import { Router } from 'express';
-import multer from 'multer';
 import path from 'node:path';
-import fs from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { requireAuth } from './auth.js';
 import db from './db.js';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads', 'gallery');
-
-if (!fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-const ALLOWED = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
-
-const storage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
-  filename: (_req, file, cb) => {
-    const safeName = file.originalname
-      .toLowerCase()
-      .replace(/[^a-z0-9.\-_]/g, '-')
-      .replace(/\s+/g, '-');
-    const ext = path.extname(safeName) || '.jpg';
-    const base = path.basename(safeName, ext).slice(0, 40) || 'image';
-    cb(null, `${Date.now()}-${base}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 12 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED.has(file.mimetype)) return cb(null, true);
-    cb(new Error('Only JPG, PNG, WEBP and GIF images are allowed.'));
-  },
-});
+import { putGalleryImage, deleteGalleryImage } from './storage.js';
 
 const router = Router();
 
-// Upload a new gallery image (admin only).
-router.post('/', requireAuth, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'No image file was provided.' });
-  res.status(201).json({
-    url: `/uploads/gallery/${req.file.filename}`,
-    filename: req.file.filename,
-  });
-});
+const MAX_BYTES = 4 * 1024 * 1024;
+const EXTENSIONS = {
+  'image/jpeg': '.jpg',
+  'image/png': '.png',
+  'image/webp': '.webp',
+  'image/gif': '.gif',
+};
 
-router.post('/upload-error', (_req, res) => {
-  res.status(400).json({ error: 'Upload failed. Please check the file type and size.' });
+// Build a safe, unique filename from the uploaded image's original name.
+const buildFilename = (originalName, contentType) => {
+  const ext = EXTENSIONS[contentType] || '.jpg';
+  const base =
+    path
+      .basename(String(originalName || 'image').replace(/\.[^.]+$/, ''))
+      .toLowerCase()
+      .replace(/[^a-z0-9.\-_]/g, '-')
+      .replace(/\s+/g, '-')
+      .slice(0, 40) || 'image';
+  return `${Date.now()}-${base}${ext}`;
+};
+
+// Upload a new gallery image (admin only). The client sends the image as a
+// base64 data URL so the request is plain JSON — Netlify Functions cannot
+// parse multipart/form-data reliably and cap bodies at ~4.5MB binary.
+router.post('/', requireAuth, async (req, res) => {
+  const { filename, contentType, data } = req.body || {};
+  const type = String(contentType || '').toLowerCase();
+  if (!EXTENSIONS[type]) {
+    return res.status(400).json({ error: 'Only JPG, PNG, WEBP and GIF images are allowed.' });
+  }
+  if (!data || typeof data !== 'string') {
+    return res.status(400).json({ error: 'No image file was provided.' });
+  }
+
+  let buffer;
+  try {
+    buffer = Buffer.from(data, 'base64');
+  } catch {
+    return res.status(400).json({ error: 'Invalid image data.' });
+  }
+  if (buffer.length === 0) {
+    return res.status(400).json({ error: 'No image file was provided.' });
+  }
+  if (buffer.length > MAX_BYTES) {
+    return res.status(413).json({ error: 'Image is too large. Maximum size is 4MB.' });
+  }
+
+  try {
+    const safeName = buildFilename(filename, type);
+    const url = await putGalleryImage(safeName, buffer, type);
+    res.status(201).json({ url, filename: safeName });
+  } catch (err) {
+    console.error('gallery upload error:', err);
+    res.status(500).json({ error: 'Upload failed. Please try again.' });
+  }
 });
 
 // Delete a gallery image (admin only).
@@ -58,11 +69,14 @@ router.delete('/:filename', requireAuth, async (req, res) => {
   if (filename !== req.params.filename || filename.startsWith('.')) {
     return res.status(400).json({ error: 'Invalid filename.' });
   }
-  const filePath = path.join(UPLOAD_DIR, filename);
-  if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found.' });
-  fs.unlinkSync(filePath);
 
-  // Also remove the entry from app_meta so deleted images don't reappear
+  try {
+    await deleteGalleryImage(filename);
+  } catch (err) {
+    console.error('gallery delete error:', err);
+  }
+
+  // Also remove the entry from app_meta so deleted images don't reappear.
   try {
     const { rows } = await db.query('SELECT value FROM app_meta WHERE key = $1', ['gallery']);
     if (rows.length > 0) {

@@ -245,29 +245,63 @@ export const registerStudentOnServer = (
 
 const GALLERY_BASE = '/api/gallery';
 
+const readAsDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.onerror = () => reject(reader.error || new Error('Could not read the image.'));
+    reader.readAsDataURL(file);
+  });
+
+// Netlify Functions cap request bodies at ~4.5MB of binary data, so shrink
+// raster images in the browser before uploading. Animated GIFs are passed
+// through unchanged (canvas would drop the animation).
+const prepareImage = async (file: File): Promise<{ dataUrl: string; contentType: string }> => {
+  if (file.type === 'image/gif') {
+    return { dataUrl: await readAsDataUrl(file), contentType: 'image/gif' };
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const MAX_EDGE = 1600;
+    const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const width = Math.max(1, Math.round(bitmap.width * scale));
+    const height = Math.max(1, Math.round(bitmap.height * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('no 2d context');
+    ctx.drawImage(bitmap, 0, 0, width, height);
+    bitmap.close();
+    return { dataUrl: canvas.toDataURL('image/jpeg', 0.82), contentType: 'image/jpeg' };
+  } catch {
+    return { dataUrl: await readAsDataUrl(file), contentType: file.type };
+  }
+};
+
 export const uploadGalleryImage = async (
   token: string,
   file: File,
 ): Promise<{ url: string; filename: string }> => {
-  const form = new FormData();
-  form.append('image', file);
-  const res = await fetch(`${GALLERY_BASE}`, {
+  const { dataUrl, contentType } = await prepareImage(file);
+  const data = dataUrl.slice(dataUrl.indexOf(',') + 1);
+  const res = await fetch(GALLERY_BASE, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${token}` },
-    body: form,
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ filename: file.name, contentType, data }),
   });
-  let data: { url?: string; filename?: string; error?: string } | null = null;
+  let body: { url?: string; filename?: string; error?: string } | null = null;
   try {
-    data = await res.json();
+    body = await res.json();
   } catch {
-    data = null;
+    body = null;
   }
   if (!res.ok) {
-    const err = new Error(data?.error || 'Upload failed.') as ApiError;
+    const err = new Error(body?.error || 'Upload failed.') as ApiError;
     err.status = res.status;
     throw err;
   }
-  return { url: data!.url!, filename: data!.filename! };
+  return { url: body!.url!, filename: body!.filename! };
 };
 
 export const deleteGalleryImage = async (
