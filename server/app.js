@@ -3,7 +3,7 @@ import compression from 'compression';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { requireDb } from './db.js';
+import { requireDb, lastDbError } from './db.js';
 import { authRouter } from './auth.js';
 import { galleryRouter } from './gallery.js';
 import { verifyRouter } from './verify.js';
@@ -63,14 +63,20 @@ if (!process.env.AWS_LAMBDA_FUNCTION_NAME) {
   }
 }
 
+// Health check — intentionally mounted BEFORE the requireDb-guarded routes so
+// it always answers, and reports the last DB error to aid diagnosis.
+app.get('/api/health', (_req, res) => {
+  res.json({
+    ok: true,
+    service: 'ksb-admin-api',
+    dbError: lastDbError ? String(lastDbError.message || lastDbError) : null,
+  });
+});
+
 app.use('/api/admin', requireDb, authRouter);
 app.use('/api/gallery', requireDb, galleryRouter);
 app.use('/api', requireDb, sessionsRouter);
 app.use('/api', verifyRouter);
-
-app.get('/api/health', (_req, res) => {
-  res.json({ ok: true, service: 'ksb-admin-api' });
-});
 
 // Central error handler for API routes (bad JSON, oversized bodies, etc.).
 app.use('/api', (err, _req, res, _next) => {

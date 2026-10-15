@@ -33,10 +33,14 @@ async function initSchema() {
   dbReady = true;
 }
 
+// Last connection/schema error, exposed on /api/health for diagnostics.
+export let lastDbError = null;
+
 // Resolves (even when the schema init is skipped) once the first startup
 // attempt to create the schema has finished. Seeders await this before they
 // touch any tables, so INSERTs never race against CREATE TABLE.
 export const schemaReady = initSchema().catch((err) => {
+  lastDbError = err;
   console.warn('Database unavailable (schema init skipped):', err.message || err);
 });
 
