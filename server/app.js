@@ -10,7 +10,15 @@ import { verifyRouter } from './verify.js';
 import { sessionsRouter } from './sessions.js';
 import { getGalleryImage } from './storage.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = (() => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    // Bundled for Netlify (CommonJS) where import.meta.url is undefined; the
+    // disk paths below are only used in local dev anyway.
+    return process.cwd();
+  }
+})();
 const app = express();
 
 // Startup diagnostics — help confirm what the running build has access to.

@@ -2,7 +2,15 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const __dirname = (() => {
+  try {
+    return path.dirname(fileURLToPath(import.meta.url));
+  } catch {
+    // Bundled for Netlify (CommonJS) where import.meta.url is undefined; the
+    // disk store below is only used in local dev (production uses Blobs).
+    return process.cwd();
+  }
+})();
 const DISK_DIR = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'uploads', 'gallery');
 
 // Netlify Functions run on AWS Lambda; uploads written to the local disk are

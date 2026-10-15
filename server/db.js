@@ -1,12 +1,7 @@
 import pg from 'pg';
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import schemaSql from './schema.js';
 
 const { Pool } = pg;
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -34,8 +29,7 @@ export const pool = new Pool({
 let dbReady = false;
 
 async function initSchema() {
-  const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
-  await pool.query(schema);
+  await pool.query(schemaSql);
   dbReady = true;
 }
 
